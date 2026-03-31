@@ -1,0 +1,16 @@
+{% extends 'pos/base.html' %}
+{% load static %}
+{% block title %}No Store Assigned{% endblock %}
+{% block content %}
+<div style="display:flex;align-items:center;justify-content:center;min-height:70vh;">
+  <div style="text-align:center;max-width:440px;">
+    <img src="{% static 'pos/images/logo.jpg' %}" alt="" style="width:100px;height:100px;border-radius:50%;opacity:0.5;margin-bottom:20px;">
+    <h2 style="color:#0077B6;margin-bottom:10px;">No Store Assigned</h2>
+    <p style="color:#6b7a8d;margin-bottom:24px;">
+      Your account ({{ request.user.username }}) is not yet assigned to a store.<br>
+      Please contact your Super Admin to be assigned to a store.
+    </p>
+    <a href="{% url 'logout' %}" class="btn-secondary"><i class="fas fa-sign-out-alt"></i> Logout</a>
+  </div>
+</div>
+{% endblock %}

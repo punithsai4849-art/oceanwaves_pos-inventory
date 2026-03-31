@@ -1,0 +1,86 @@
+{% extends 'pos/base.html' %}
+{% block title %}Credit Tracking — Ocean Waves{% endblock %}
+{% block content %}
+<div class="pg">
+  <style>
+    .data-table thead th {
+      background-color: #27A4D1;
+      color: white;
+    }
+  </style>
+  <div class="pg-header">
+    <div>
+      <h1><i class="fas fa-file-invoice-dollar"></i> Credit Records</h1>
+      <p>Track wholesale credits and mark payments</p>
+    </div>
+    <div style="display:flex; gap:10px;">
+      <a href="{% url 'wholesale_customers' %}" class="btn-secondary" style="text-decoration:none;"><i class="fas fa-users"></i> Add Customers</a>
+      <a href="{% url 'credit_add_external' %}" class="btn-primary" style="text-decoration:none;"><i class="fas fa-plus"></i> Add External Credit</a>
+    </div>
+  </div>
+
+  <div class="table-card">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Customer</th>
+          <th>Bill No.</th>
+          <th>Store</th>
+          <th>Amount</th>
+          <th>Due Date</th>
+          <th>Status</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for r in records %}
+      <tr>
+        <td>{{ r.created_at|date:"d M Y" }}</td>
+        <td><strong>{{ r.customer.name }}</strong></td>
+        <td>
+          {% if r.is_external %}
+            <strong>#{{ r.external_reference|default:"Ext-CR" }}</strong>
+          {% else %}
+            #{{ r.sale.bill_number }}
+          {% endif %}
+        </td>
+        <td>
+          {% if r.is_external %}
+            <span class="pill pill-blue">External</span>
+          {% else %}
+            {{ r.sale.store.name|default:"—" }}
+          {% endif %}
+        </td>
+        <td>₹{{ r.total_due }}</td>
+        <td>{{ r.due_date|date:"d M Y" }}</td>
+        <td>
+          {% if r.is_paid %}
+          <span class="pill pill-green">Paid ({{ r.paid_on|date:"d M" }})</span>
+          {% else %}
+          <span class="pill pill-red">Unpaid</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if not r.is_paid %}
+            {% if r.is_external or profile.store == r.sale.store or profile.is_superadmin or profile.is_wholesale_exec or profile.is_area_manager %}
+            <form method="POST" action="{% url 'credit_pay' r.id %}" onsubmit="return confirm('Mark this credit as paid by {{ r.customer.name }}?');" style="display:inline;">
+              {% csrf_token %}
+              <button class="btn-primary" style="padding:4px 8px; font-size:12px;">Mark Paid</button>
+            </form>
+            {% else %}
+            —
+            {% endif %}
+          {% else %}
+          <i class="fas fa-check" style="color:green;"></i>
+          {% endif %}
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="8" class="empty-mini">No credit records found.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

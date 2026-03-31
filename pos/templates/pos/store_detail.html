@@ -1,0 +1,89 @@
+{% extends 'pos/base.html' %}
+{% load static %}
+{% block title %}{{ store.name }} — Store Detail{% endblock %}
+{% block content %}
+<div class="pg">
+  <div class="pg-header">
+    <div>
+      <a href="{% url 'store_list' %}" class="back-link"><i class="fas fa-arrow-left"></i> All Stores</a>
+      <h1><i class="fas fa-store-alt"></i> {{ store.name }}</h1>
+      <p>{{ store.address }}{% if store.phone %} · {{ store.phone }}{% endif %} {% if store.gstin %}· GSTIN: {{ store.gstin }}{% endif %}</p>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;">
+      <form method="GET" style="display:flex;gap:8px;align-items:center;">
+        <input type="date" name="date" value="{{ report_date|date:'Y-m-d' }}" onchange="this.form.submit()" class="date-input">
+      </form>
+      <a href="{% url 'export_excel' %}?date={{ report_date|date:'Y-m-d' }}&store={{ store.id }}" class="btn-excel"><i class="fas fa-file-excel"></i> Export</a>
+    </div>
+  </div>
+
+  <h3 class="section-title">📊 {{ report_date|date:"d F Y" }} Report</h3>
+  <div class="kpi-grid">
+    <div class="kpi blue"><div class="kpi-icon"><i class="fas fa-receipt"></i></div><div class="kpi-body"><span class="kpi-val">{{ sales.count }}</span><span class="kpi-lbl">Bills</span></div></div>
+    <div class="kpi green"><div class="kpi-icon"><i class="fas fa-rupee-sign"></i></div><div class="kpi-body"><span class="kpi-val">₹{{ total_sales|floatformat:0 }}</span><span class="kpi-lbl">Sales</span></div></div>
+    <div class="kpi orange"><div class="kpi-icon"><i class="fas fa-shopping-cart"></i></div><div class="kpi-body"><span class="kpi-val">₹{{ total_cost|floatformat:0 }}</span><span class="kpi-lbl">Cost</span></div></div>
+    <div class="kpi teal"><div class="kpi-icon"><i class="fas fa-chart-line"></i></div><div class="kpi-body"><span class="kpi-val">₹{{ total_profit|floatformat:0 }}</span><span class="kpi-lbl">Profit</span></div></div>
+    <div class="kpi purple"><div class="kpi-icon"><i class="fas fa-calendar-alt"></i></div><div class="kpi-body"><span class="kpi-val">₹{{ month_sales|floatformat:0 }}</span><span class="kpi-lbl">Month Sales</span></div></div>
+    <div class="kpi grey"><div class="kpi-icon"><i class="fas fa-chart-bar"></i></div><div class="kpi-body"><span class="kpi-val">₹{{ month_profit|floatformat:0 }}</span><span class="kpi-lbl">Month Profit</span></div></div>
+  </div>
+
+  <div class="dash-grid2">
+    <!-- Staff -->
+    <div class="dash-card">
+      <div class="dc-header"><h3><i class="fas fa-users"></i> Staff ({{ staff|length }})</h3>
+        <a href="{% url 'user_management' %}" class="btn-sm blue">Manage</a></div>
+      <table class="mini-table">
+        <thead><tr><th>Name</th><th>Role</th><th>Username</th></tr></thead>
+        <tbody>
+        {% for up in staff %}
+        <tr><td>{{ up.user.get_full_name|default:up.user.username }}</td>
+            <td><span class="pill pill-{{ up.role|lower }}">{{ up.get_role_display }}</span></td>
+            <td>{{ up.user.username }}</td></tr>
+        {% empty %}<tr><td colspan="3" class="empty-mini">No staff assigned</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Products overview -->
+    <div class="dash-card">
+      <div class="dc-header"><h3><i class="fas fa-fish"></i> Products ({{ products.count }})</h3></div>
+      <table class="mini-table">
+        <thead><tr><th>Product</th><th>Stock</th><th>Retail ₹</th><th>WS ₹</th></tr></thead>
+        <tbody>
+        {% for p in products|slice:":8" %}
+        <tr class="{% if p.is_out_of_stock %}row-red{% elif p.is_low_stock %}row-orange{% endif %}">
+          <td>{{ p.name }}</td>
+          <td>{{ p.stock_quantity }} kg</td>
+          <td>{{ p.retail_price }}</td>
+          <td>{{ p.wholesale_price }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Sales table -->
+  {% if sales %}
+  <div class="table-card">
+    <div class="tc-header"><h3><i class="fas fa-list"></i> Bills on {{ report_date|date:"d M Y" }}</h3></div>
+    <table class="data-table">
+      <thead><tr><th>Bill #</th><th>Time</th><th>Type</th><th>Customer</th><th>Payment</th><th>Amount</th><th>Print</th></tr></thead>
+      <tbody>
+      {% for s in sales %}
+      <tr>
+        <td><strong>{{ s.bill_number }}</strong></td>
+        <td>{{ s.created_at|date:"h:i A" }}</td>
+        <td><span class="pill {% if s.bill_type == 'WHOLESALE' %}pill-blue{% else %}pill-green{% endif %}">{{ s.bill_type }}</span></td>
+        <td>{{ s.customer_name|default:"Walk-in" }}</td>
+        <td>{{ s.get_payment_mode_display }}</td>
+        <td><strong>₹{{ s.grand_total }}</strong></td>
+        <td><a href="{% url 'bill_print' s.id %}" target="_blank" class="btn-icon-sm blue"><i class="fas fa-print"></i></a></td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

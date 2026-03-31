@@ -1,0 +1,20 @@
+<div style="background:#fff;border:2px solid #27a4d1;border-radius:8px;padding:20px;margin-bottom:20px;">
+  <h3 style="color:#27a4d1;margin-bottom:15px;"><i class="fas fa-key"></i> Recent OTP Requests</h3>
+  <table class="data-table">
+    <thead>
+      <tr><th>Store</th><th>Requested At</th><th>Your Secure OTP</th><th>Expires In</th></tr>
+    </thead>
+    <tbody>
+      {% for otp in recent_otps %}
+      <tr>
+        <td><strong>{{ otp.store_name }}</strong></td>
+        <td>{{ otp.time }}</td>
+        <td style="font-size:24px;color:#d9534f;font-weight:900;letter-spacing:4px;">{{ otp.code }}</td>
+        <td><i class="fas fa-clock"></i> Active</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="4" class="text-muted"><i class="fas fa-check-circle"></i> No active OTP requests.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>

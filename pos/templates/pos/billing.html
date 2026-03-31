@@ -1,0 +1,340 @@
+{% extends 'pos/base.html' %}
+{% load static %}
+{% block title %}Billing — {{ store.name }}{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'pos/css/billing.css' %}">{% endblock %}
+
+{% block content %}
+<!-- Mobile tab switcher (hidden on desktop via CSS) -->
+<div class="billing-mobile-tabs">
+  <button class="bmt active" id="bmtProducts" onclick="billingTab('products')">
+    <i class="fas fa-fish"></i> Products
+  </button>
+  <button class="bmt" id="bmtBill" onclick="billingTab('bill')">
+    <i class="fas fa-receipt"></i> Bill
+  </button>
+</div>
+
+<div class="billing-layout">
+
+  <!-- ═══ LEFT: Products ═══ -->
+  <div class="prod-panel" id="billingProdPanel">
+    <div class="prod-panel-hdr">
+      <div class="pph-top">
+        <h2><i class="fas fa-fish"></i> Products</h2>
+        <span class="store-tag">{{ store.name }}</span>
+      </div>
+      <div class="cat-filters">
+        <button class="cf active" data-cat="ALL">All</button>
+        <button class="cf" data-cat="FISH">🐟 Fish</button>
+        <button class="cf" data-cat="PRAWNS">🦐 Prawns</button>
+        <button class="cf" data-cat="CRAB">🦀 Crab</button>
+        <button class="cf" data-cat="OTHER">🔹 Other</button>
+      </div>
+      <input type="text" id="prodSearch" class="prod-search" placeholder="🔍 Search..." oninput="filterProds()">
+    </div>
+
+    <div class="prod-grid" id="prodGrid">
+      {% for p in products %}
+      <div class="prod-tile {% if p.is_out_of_stock %}oos{% elif p.is_low_stock %}low{% endif %}"
+           data-id="{{ p.id }}" data-name="{{ p.name|escapejs }}"
+           data-retail="{{ p.retail_price }}" data-ws="{{ p.wholesale_price }}"
+           data-stock="{{ p.stock_quantity }}" data-cat="{{ p.category }}"
+           onclick="addToCart(this)">
+        <div class="pt-cat">{{ p.get_category_display }}</div>
+        <div class="pt-name">{{ p.name }}</div>
+        <div class="pt-prices">
+          <span class="pt-retail">R: ₹{{ p.retail_price }}</span>
+          <span class="pt-ws">W: ₹{{ p.wholesale_price }}</span>
+        </div>
+        <div class="pt-stock {% if p.is_low_stock %}low{% endif %}">{{ p.stock_quantity }} kg</div>
+        {% if p.is_out_of_stock %}<div class="pt-badge oos-badge">Out</div>
+        {% elif p.is_low_stock %}<div class="pt-badge low-badge">Low</div>{% endif %}
+      </div>
+      {% empty %}
+      <div class="no-prods"><i class="fas fa-fish"></i>
+        <p>No products.<br><a href="{% url 'inventory' %}">Add products →</a></p></div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- ═══ RIGHT: Bill ═══ -->
+  <div class="bill-panel" id="billingBillPanel">
+    <div class="bill-hdr">
+      <div class="wm-logo"><img src="{% static 'pos/images/logo.jpg' %}" alt=""></div>
+      <div class="bh-top">
+        <h2><i class="fas fa-receipt"></i> New Bill</h2>
+        <span class="store-tag-sm">{{ store.name }}</span>
+      </div>
+      <div class="bill-type-btns">
+        <button class="btb active" id="btnRetail" onclick="setBillType('RETAIL')">
+          <i class="fas fa-shopping-bag"></i> Retail
+          <small>No GST · Instant</small>
+        </button>
+        <button class="btb" id="btnWS" onclick="setBillType('WHOLESALE')">
+          <i class="fas fa-industry"></i> Wholesale
+          <small>GST · PIN Required</small>
+        </button>
+      </div>
+    </div>
+
+    <!-- Universal Customer fields -->
+    <div class="customer-info-box" style="padding: 15px 20px 0;">
+      <div class="wf-grid">
+        <input type="text" id="custName" list="wsCustomers" placeholder="Customer Name (Optional for Retail)" oninput="fillCustomerData()">
+        <datalist id="wsCustomers">
+          {% for wc in wholesale_customers %}
+          <option value="{{ wc.name }}" data-phone="{{ wc.phone }}" data-gst="{{ wc.gst|default:'' }}" data-credit-enabled="{{ wc.is_credit_enabled|yesno:'true,false' }}" data-has-unpaid="{{ wc.has_unpaid_credit|yesno:'true,false' }}"></option>
+          {% endfor %}
+        </datalist>
+        <input type="text" id="custPhone" placeholder="WhatsApp Number">
+      </div>
+    </div>
+
+    <!-- Wholesale-only extra fields -->
+    <div id="wsForm" class="ws-form" style="display:none; margin-top: 10px;">
+      <div class="ws-notice">
+        <i class="fas fa-shield-alt"></i>
+        Area Manager PIN required to complete wholesale bill
+      </div>
+      <div class="wf-grid">
+        <input type="text" id="custGST"   placeholder="GSTIN (optional)">
+        <select id="gstRate" onchange="recalc()">
+          <option value="5">GST 5%</option>
+          <option value="12">GST 12%</option>
+          <option value="18">GST 18%</option>
+          <option value="28">GST 28%</option>
+        </select>
+      </div>
+    </div>
+    <script>
+    function fillCustomerData() {
+      const input = document.getElementById('custName');
+      const dl = document.getElementById('wsCustomers');
+      const creditBtn = document.getElementById('btnCredit');
+      
+      let isExisting = false;
+      let creditEnabled = true;
+      let hasUnpaid = false;
+
+      for (let opt of dl.options) {
+        if (opt.value === input.value) {
+          isExisting = true;
+          if(opt.getAttribute('data-phone')) document.getElementById('custPhone').value = opt.getAttribute('data-phone');
+          if(opt.getAttribute('data-gst')) document.getElementById('custGST').value = opt.getAttribute('data-gst');
+          creditEnabled = (opt.getAttribute('data-credit-enabled') === 'true');
+          hasUnpaid = (opt.getAttribute('data-has-unpaid') === 'true');
+          break;
+        }
+      }
+
+      if (creditBtn) {
+        if (isExisting && (!creditEnabled || hasUnpaid)) {
+            creditBtn.disabled = true;
+            creditBtn.style.opacity = '0.4';
+            creditBtn.title = !creditEnabled ? "Credit disabled for this user" : "User has an active unpaid credit bill";
+            if (document.querySelector('.pm.active') && document.querySelector('.pm.active').getAttribute('data-m') === 'CREDIT') {
+                document.querySelector('.pm[data-m="CASH"]').click();
+            }
+        } else {
+            creditBtn.disabled = false;
+            creditBtn.style.opacity = '1';
+            creditBtn.title = "Pay via Credit";
+        }
+      }
+    }
+    </script>
+
+    <!-- Cart table -->
+    <div class="cart-wrap">
+      <table class="cart-tbl">
+        <thead><tr><th>Product</th><th>Qty (kg)</th><th>Price (₹/kg)</th><th>Total</th><th></th></tr></thead>
+        <tbody id="cartBody">
+          <tr id="emptyRow">
+            <td colspan="5" class="empty-cart">
+              <i class="fas fa-shopping-cart"></i><br>Click products to add
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Discount -->
+    <div class="discount-row">
+      <label><i class="fas fa-tag"></i> Discount (₹)</label>
+      <input type="number" id="discountAmt" min="0" step="0.01" value="0" oninput="recalc()">
+    </div>
+
+    <!-- Totals -->
+    <div class="bill-totals">
+      <div class="bt-row"><span>Subtotal</span><span id="subtotalVal">₹0.00</span></div>
+      <div class="bt-row disc-row" id="discRow" style="display:none">
+        <span>Discount</span><span id="discVal" class="text-red">-₹0.00</span></div>
+      <div class="bt-row gst-line" id="cgstRow" style="display:none">
+        <span>CGST (<span id="cgstLbl">2.5</span>%)</span><span id="cgstVal">₹0.00</span></div>
+      <div class="bt-row gst-line" id="sgstRow" style="display:none">
+        <span>SGST (<span id="sgstLbl">2.5</span>%)</span><span id="sgstVal">₹0.00</span></div>
+      <div class="bt-row grand"><span>Grand Total</span><span id="grandVal">₹0.00</span></div>
+    </div>
+
+    <!-- Payment & actions -->
+    <div class="bill-footer">
+      <div class="pay-mode">
+        <span>Payment:</span>
+        <button class="pm active" data-m="CASH"   onclick="setPayment('CASH',this)"><i class="fas fa-money-bill"></i> Cash</button>
+        <button class="pm"        data-m="UPI"    onclick="setPayment('UPI',this)"><i class="fas fa-mobile-alt"></i> UPI</button>
+        <button class="pm"        data-m="ONLINE" onclick="setPayment('ONLINE',this)"><i class="fas fa-credit-card"></i> Online</button>
+        <button class="pm"        data-m="CARD"   onclick="setPayment('CARD',this)"><i class="fas fa-credit-card"></i> Card</button>
+        <button class="pm"        data-m="CREDIT" id="btnCredit" style="display:none" onclick="setPayment('CREDIT',this)"><i class="fas fa-book-open"></i> Credit</button>
+      </div>
+      <div class="bill-btns">
+        <button class="btn-clear" onclick="clearCart()"><i class="fas fa-trash"></i></button>
+        <button class="btn-save" style="background:#25D366; color:white; border-color:#25D366;" onclick="saveBill('whatsapp')"><i class="fab fa-whatsapp"></i> &nbsp;WhatsApp</button>
+        <button class="btn-save" onclick="saveBill('print')"><i class="fas fa-print"></i> &nbsp;Print</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     PIN APPROVAL MODAL
+═══════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="pinModal">
+  <div class="modal pin-modal">
+
+    <!-- Header -->
+    <div class="pin-modal-hdr">
+      <div class="pin-shield"><i class="fas fa-user-shield"></i></div>
+      <h2>Wholesale Approval</h2>
+      <p id="pinSubtitle">Select Area Manager &amp; enter PIN</p>
+    </div>
+
+    <!-- Bill summary strip -->
+    <div class="pin-bill-strip" id="pinBillStrip"></div>
+
+    <!-- Loading -->
+    <div class="pin-step" id="pinStepLoading">
+      <div class="pin-spinner"><i class="fas fa-spinner fa-spin"></i> Loading managers...</div>
+    </div>
+
+    <!-- Manager select + PIN entry -->
+    <div class="pin-step" id="pinStepForm" style="display:none">
+
+      <!-- Manager selector (shown if >1 AM) -->
+      <div id="managerSelectWrap" style="display:none" class="pin-section">
+        <label class="pin-label">Select Area Manager:</label>
+        <div class="manager-list" id="managerList"></div>
+      </div>
+
+      <div class="pin-actions" id="otpRequestActions" style="margin-bottom: 20px;">
+        <button type="button" class="btn-primary" id="btnRequestOTP" onclick="requestOTP()" style="width: 100%;">
+          <i class="fas fa-paper-plane"></i> Send OTP to Manager
+        </button>
+      </div>
+
+      <!-- OTP entry -->
+      <div class="pin-section" id="otpInputSection" style="display: none;">
+        <label class="pin-label">
+          <span id="pinLabel">Enter 6-Digit OTP:</span>
+          <span class="pin-attempts" id="pinAttempts"></span>
+        </label>
+
+        <!-- Big digit boxes optimised for fast entry -->
+        <div class="pin-boxes" id="pinBoxes">
+          <input type="password" inputmode="numeric" maxlength="1" class="pin-box" oninput="pinBoxInput(this,0)" onkeydown="pinBoxKey(event,0)">
+          <input type="password" inputmode="numeric" maxlength="1" class="pin-box" oninput="pinBoxInput(this,1)" onkeydown="pinBoxKey(event,1)">
+          <input type="password" inputmode="numeric" maxlength="1" class="pin-box" oninput="pinBoxInput(this,2)" onkeydown="pinBoxKey(event,2)">
+          <input type="password" inputmode="numeric" maxlength="1" class="pin-box" oninput="pinBoxInput(this,3)" onkeydown="pinBoxKey(event,3)">
+          <input type="password" inputmode="numeric" maxlength="1" class="pin-box pin-box-opt" oninput="pinBoxInput(this,4)" onkeydown="pinBoxKey(event,4)">
+          <input type="password" inputmode="numeric" maxlength="1" class="pin-box pin-box-opt" oninput="pinBoxInput(this,5)" onkeydown="pinBoxKey(event,5)">
+        </div>
+
+        <!-- Numeric keypad (touch-friendly) -->
+        <div class="numpad">
+          <button class="np-btn" onclick="npPress('1')">1</button>
+          <button class="np-btn" onclick="npPress('2')">2</button>
+          <button class="np-btn" onclick="npPress('3')">3</button>
+          <button class="np-btn" onclick="npPress('4')">4</button>
+          <button class="np-btn" onclick="npPress('5')">5</button>
+          <button class="np-btn" onclick="npPress('6')">6</button>
+          <button class="np-btn" onclick="npPress('7')">7</button>
+          <button class="np-btn" onclick="npPress('8')">8</button>
+          <button class="np-btn" onclick="npPress('9')">9</button>
+          <button class="np-btn np-clear" onclick="npClear()"><i class="fas fa-times"></i></button>
+          <button class="np-btn" onclick="npPress('0')">0</button>
+          <button class="np-btn np-back" onclick="npBackspace()"><i class="fas fa-backspace"></i></button>
+        </div>
+      </div> <!-- end otpInputSection -->
+
+      <div class="pin-feedback" id="pinFeedback" style="margin-bottom: 15px;"></div>
+
+      <div class="pin-actions">
+        <button class="btn-secondary" onclick="closePinModal()">Cancel</button>
+        <button class="btn-verify-pin" id="btnVerifyPin" onclick="verifyPin()">
+          <i class="fas fa-check-circle"></i> Verify & Save Bill
+        </button>
+      </div>
+    </div>
+
+    <!-- Error state -->
+    <div class="pin-step" id="pinStepError" style="display:none">
+      <div class="pin-err-box" id="pinErrMsg"></div>
+      <div class="pin-actions">
+        <button class="btn-secondary" onclick="closePinModal()">Cancel</button>
+        <button class="btn-primary"   onclick="openPinModal()">
+          <i class="fas fa-redo"></i> Retry
+        </button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const CSRF             = '{{ csrf_token }}';
+const SAVE_URL         = '{% url "save_bill" %}';
+const WS_MANAGERS_URL  = '{% url "wholesale_managers" %}';
+const WS_REQUEST_OTP   = '{% url "wholesale_request_otp" %}';
+const WS_VERIFY_URL    = '{% url "wholesale_verify_otp" %}';
+const PRINT_BASE       = '/billing/print/';
+</script>
+<script src="{% static 'pos/js/billing.js' %}?v=6"></script>
+<script>
+// Mobile tab switcher for billing page
+function billingTab(tab) {
+  const pp = document.getElementById('billingProdPanel');
+  const bp = document.getElementById('billingBillPanel');
+  const btnP = document.getElementById('bmtProducts');
+  const btnB = document.getElementById('bmtBill');
+  if (tab === 'products') {
+    pp.classList.remove('mobile-hidden');
+    bp.classList.add('mobile-hidden');
+    btnP.classList.add('active');
+    btnB.classList.remove('active');
+  } else {
+    pp.classList.add('mobile-hidden');
+    bp.classList.remove('mobile-hidden');
+    btnB.classList.add('active');
+    btnP.classList.remove('active');
+  }
+}
+// Auto-switch to Bill tab on mobile when product is added
+const _origAddToCart = typeof addToCart !== 'undefined' ? addToCart : null;
+document.addEventListener('DOMContentLoaded', function() {
+  if (window.innerWidth <= 768) {
+    // Patch addToCart to auto-switch tab
+    const prodGrid = document.getElementById('prodGrid');
+    if (prodGrid) {
+      prodGrid.addEventListener('click', function() {
+        setTimeout(function() {
+          const rows = document.querySelectorAll('#cartBody tr:not(#emptyRow)');
+          if (rows.length > 0) billingTab('bill');
+        }, 120);
+      });
+    }
+  }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,178 @@
+{% extends 'pos/base.html' %}
+{% load static %}
+{% block title %}Employees — {{ store.name }}{% endblock %}
+{% block content %}
+<div class="pg">
+  <div class="pg-header">
+    <div><h1><i class="fas fa-users"></i> Employee Manager — {{ store.name }}</h1><p>Manage staff, salaries and payslips</p></div>
+    <button class="btn-primary" onclick="openModal('addEmpModal')"><i class="fas fa-user-plus"></i> Add Employee</button>
+  </div>
+
+  <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr)">
+    <div class="kpi blue"><div class="kpi-icon"><i class="fas fa-users"></i></div><div class="kpi-body"><span class="kpi-val">{{ employees|length }}</span><span class="kpi-lbl">Total Employees</span></div></div>
+    <div class="kpi green"><div class="kpi-icon"><i class="fas fa-user-check"></i></div><div class="kpi-body"><span class="kpi-val">{% for e in employees %}{% if e.is_active %}{{ forloop.counter0|add:1 }}{% endif %}{% endfor %}</span><span class="kpi-lbl">Active</span></div></div>
+    <div class="kpi orange"><div class="kpi-icon"><i class="fas fa-rupee-sign"></i></div><div class="kpi-body"><span class="kpi-val">₹{{ total_payroll|floatformat:0 }}</span><span class="kpi-lbl">Monthly Payroll</span></div></div>
+    <div class="kpi purple"><div class="kpi-icon"><i class="fas fa-file-invoice"></i></div><div class="kpi-body"><span class="kpi-val">{{ employees|length }}</span><span class="kpi-lbl">On Payroll</span></div></div>
+  </div>
+
+  <div class="table-card">
+    <div class="wm-bg"><img src="{% static 'pos/images/logo.jpg' %}" alt=""></div>
+    <table class="data-table">
+      <thead>
+        <tr><th>ID</th><th>Name</th><th>Designation</th><th>Type</th><th>Basic Salary</th><th>Net Salary</th><th>Status</th><th>Actions</th></tr>
+      </thead>
+      <tbody>
+      {% for emp in employees %}
+      <tr class="{% if not emp.is_active %}row-red{% endif %}">
+        <td><strong>{{ emp.employee_id }}</strong></td>
+        <td>
+          <div style="font-weight:700;">{{ emp.full_name }}</div>
+          {% if emp.phone %}<div style="font-size:11px;color:var(--muted);">{{ emp.phone }}</div>{% endif %}
+        </td>
+        <td>{{ emp.designation|default:"—" }}</td>
+        <td><span class="pill pill-blue">{{ emp.get_employment_type_display }}</span></td>
+        <td class="tr">₹{{ emp.basic_salary }}</td>
+        <td class="tr"><strong>₹{{ emp.net_salary }}</strong></td>
+        <td>{% if emp.is_active %}<span class="pill pill-green">Active</span>{% else %}<span class="pill pill-red">Inactive</span>{% endif %}</td>
+        <td style="display:flex;gap:5px;">
+          <a href="{% url 'employee_detail' emp.id %}" class="btn-icon-sm blue" title="View Payslips"><i class="fas fa-file-invoice"></i></a>
+          <button class="btn-icon-sm green" title="Edit"
+            onclick="openEditEmp({{ emp.id }},'{{ emp.full_name|escapejs }}','{{ emp.phone|escapejs }}','{{ emp.email|escapejs }}','{{ emp.designation|escapejs }}','{{ emp.employment_type }}','{{ emp.pay_cycle }}',{{ emp.basic_salary }},{{ emp.allowances }},{{ emp.deductions }},{{ emp.is_active|lower }},'{{ emp.notes|escapejs }}')">
+            <i class="fas fa-edit"></i>
+          </button>
+          <button class="btn-icon-sm red" title="Deactivate"
+            onclick="confirmDeactivate({{ emp.id }},'{{ emp.full_name|escapejs }}')">
+            <i class="fas fa-user-times"></i>
+          </button>
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="8" class="empty-state"><i class="fas fa-users"></i><p>No employees yet. Add your first employee!</p></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Add Employee Modal -->
+<div class="modal-overlay" id="addEmpModal">
+  <div class="modal">
+    <div class="mhdr"><h3><i class="fas fa-user-plus"></i> Add Employee</h3><button onclick="closeModal('addEmpModal')">×</button></div>
+    <form method="POST" action="{% url 'employee_add' %}" class="mform">
+      {% csrf_token %}
+      <div class="frow">
+        <div class="fg"><label>Full Name *</label><input type="text" name="full_name" required placeholder="Employee full name"></div>
+        <div class="fg"><label>Designation</label><input type="text" name="designation" placeholder="e.g. Cashier, Store Manager"></div>
+      </div>
+      <div class="frow">
+        <div class="fg"><label>Phone</label><input type="text" name="phone" placeholder="+91 9876543210"></div>
+        <div class="fg"><label>Email</label><input type="email" name="email" placeholder="employee@email.com"></div>
+      </div>
+      <div class="frow">
+        <div class="fg"><label>Employment Type</label>
+          <select name="employment_type">
+            <option value="FULLTIME">Full Time</option><option value="PARTTIME">Part Time</option>
+            <option value="CONTRACT">Contract</option><option value="DAILY">Daily Wage</option>
+          </select>
+        </div>
+        <div class="fg"><label>Pay Cycle</label>
+          <select name="pay_cycle">
+            <option value="MONTHLY">Monthly</option><option value="WEEKLY">Weekly</option><option value="DAILY">Daily</option>
+          </select>
+        </div>
+      </div>
+      <div class="price-section-label">💰 Salary Details (₹)</div>
+      <div class="frow frow3">
+        <div class="fg"><label>Basic Salary *</label><input type="number" name="basic_salary" step="0.01" min="0" required placeholder="25000"></div>
+        <div class="fg"><label>Allowances</label><input type="number" name="allowances" step="0.01" min="0" value="0" placeholder="HRA, travel..."></div>
+        <div class="fg"><label>Deductions</label><input type="number" name="deductions" step="0.01" min="0" value="0" placeholder="PF, ESI..."></div>
+      </div>
+      <div class="fg"><label>Date Joined</label><input type="date" name="date_joined"></div>
+      <div class="fg"><label>Notes</label><textarea name="notes" rows="2" placeholder="Any additional notes..."></textarea></div>
+      <div class="mactions">
+        <button type="button" class="btn-secondary" onclick="closeModal('addEmpModal')">Cancel</button>
+        <button type="submit" class="btn-primary"><i class="fas fa-save"></i> Add Employee</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Edit Employee Modal -->
+<div class="modal-overlay" id="editEmpModal">
+  <div class="modal">
+    <div class="mhdr"><h3><i class="fas fa-edit"></i> Edit Employee</h3><button onclick="closeModal('editEmpModal')">×</button></div>
+    <form id="editEmpForm" method="POST" class="mform">
+      {% csrf_token %}
+      <div class="frow">
+        <div class="fg"><label>Full Name *</label><input type="text" name="full_name" id="eeFN" required></div>
+        <div class="fg"><label>Designation</label><input type="text" name="designation" id="eeDes"></div>
+      </div>
+      <div class="frow">
+        <div class="fg"><label>Phone</label><input type="text" name="phone" id="eePh"></div>
+        <div class="fg"><label>Email</label><input type="email" name="email" id="eeEm"></div>
+      </div>
+      <div class="frow">
+        <div class="fg"><label>Employment Type</label>
+          <select name="employment_type" id="eeET">
+            <option value="FULLTIME">Full Time</option><option value="PARTTIME">Part Time</option>
+            <option value="CONTRACT">Contract</option><option value="DAILY">Daily Wage</option>
+          </select>
+        </div>
+        <div class="fg"><label>Pay Cycle</label>
+          <select name="pay_cycle" id="eePC">
+            <option value="MONTHLY">Monthly</option><option value="WEEKLY">Weekly</option><option value="DAILY">Daily</option>
+          </select>
+        </div>
+      </div>
+      <div class="price-section-label">💰 Salary Details (₹)</div>
+      <div class="frow frow3">
+        <div class="fg"><label>Basic Salary</label><input type="number" name="basic_salary" id="eeBS" step="0.01" min="0"></div>
+        <div class="fg"><label>Allowances</label><input type="number" name="allowances" id="eeAl" step="0.01" min="0"></div>
+        <div class="fg"><label>Deductions</label><input type="number" name="deductions" id="eeDe" step="0.01" min="0"></div>
+      </div>
+      <div class="fg checkbox-fg"><label><input type="checkbox" name="is_active" id="eeAct"> Employee is Active</label></div>
+      <div class="fg"><label>Notes</label><textarea name="notes" id="eeNotes" rows="2"></textarea></div>
+      <div class="mactions">
+        <button type="button" class="btn-secondary" onclick="closeModal('editEmpModal')">Cancel</button>
+        <button type="submit" class="btn-primary">Update</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Deactivate confirm -->
+<div class="modal-overlay" id="deactivateModal">
+  <div class="modal modal-sm">
+    <div class="mhdr danger"><h3><i class="fas fa-user-times"></i> Deactivate Employee</h3><button onclick="closeModal('deactivateModal')">×</button></div>
+    <div class="mbody"><p>Deactivate <strong id="deactName"></strong>?</p></div>
+    <form id="deactForm" method="POST" class="mform">
+      {% csrf_token %}
+      <div class="mactions">
+        <button type="button" class="btn-secondary" onclick="closeModal('deactivateModal')">Cancel</button>
+        <button type="submit" class="btn-danger">Deactivate</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
+{% block extra_js %}
+<script>
+function openEditEmp(id,fn,ph,em,des,et,pc,bs,al,de,active,notes) {
+  document.getElementById('eeFN').value=fn; document.getElementById('eePh').value=ph;
+  document.getElementById('eeEm').value=em; document.getElementById('eeDes').value=des;
+  document.getElementById('eeET').value=et; document.getElementById('eePC').value=pc;
+  document.getElementById('eeBS').value=bs; document.getElementById('eeAl').value=al;
+  document.getElementById('eeDe').value=de; document.getElementById('eeAct').checked=active;
+  document.getElementById('eeNotes').value=notes;
+  document.getElementById('editEmpForm').action=`/employees/${id}/edit/`;
+  openModal('editEmpModal');
+}
+function confirmDeactivate(id,name) {
+  document.getElementById('deactName').textContent=name;
+  document.getElementById('deactForm').action=`/employees/${id}/delete/`;
+  openModal('deactivateModal');
+}
+document.querySelectorAll('.modal-overlay').forEach(o=>o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('active');}));
+</script>
+{% endblock %}

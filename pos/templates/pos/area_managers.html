@@ -1,0 +1,196 @@
+{% extends 'pos/base.html' %}
+{% load static %}
+{% block title %}Area Managers — Ocean Waves{% endblock %}
+{% block content %}
+<div class="pg">
+  <div class="pg-header">
+    <div>
+      <h1><i class="fas fa-user-shield"></i> Area Manager Management</h1>
+      <p>Assign AMs to stores · Set approval PINs · View approval history</p>
+    </div>
+    <a href="{% url 'approval_history' %}" class="btn-secondary">
+      <i class="fas fa-history"></i> Approval History
+    </a>
+  </div>
+
+  <div class="info-banner">
+    <i class="fas fa-info-circle"></i>
+    <div>
+      <strong>How OTP Approval works:</strong>
+      When a cashier saves a wholesale bill, they select the Area Manager on-screen and click <strong>"Send OTP"</strong>.
+      An email containing a 6-digit secure code will dispatch directly to the manager. All approvals are logged with time, email, and bill details.
+    </div>
+  </div>
+
+  {% if not managers %}
+  <div class="empty-state" style="padding:52px;">
+    <i class="fas fa-user-shield"></i>
+    <p style="margin-bottom:8px;">No Area Managers yet.</p>
+    <p style="font-size:13px;color:var(--muted);">
+      Go to <a href="{% url 'user_management' %}">User Management</a> → Create User → Role: <strong>Area Manager</strong>
+    </p>
+  </div>
+  {% else %}
+
+  <div class="am-grid">
+    {% for mgr in managers %}
+    <div class="am-card">
+      <div class="am-card-hdr">
+        <div class="am-avatar"><i class="fas fa-user-shield"></i></div>
+        <div class="am-info">
+          <h3>{{ mgr.user.get_full_name|default:mgr.user.username }}</h3>
+          <p>@{{ mgr.user.username }}</p>
+          {% if mgr.phone %}<p class="am-phone"><i class="fas fa-phone"></i> {{ mgr.phone }}</p>{% endif %}
+        </div>
+        <div style="margin-left:auto;display:flex;flex-direction:column;gap:4px;align-items:flex-end;">
+          {% if mgr.is_active %}
+          <span class="pill pill-blue">Active</span>
+          {% else %}
+          <span class="pill pill-red">Inactive</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Assigned stores -->
+      <div class="am-stores-section">
+        <div class="am-stores-hdr">
+          <span><i class="fas fa-store"></i> Stores ({{ mgr.managed_stores.count }})</span>
+          <button class="btn-sm blue" onclick="openAssign({{ mgr.id }}, '{{ mgr.user.username|escapejs }}')">
+            <i class="fas fa-plus"></i> Assign Store
+          </button>
+        </div>
+        {% if mgr.managed_stores.all %}
+        <div class="am-store-list">
+          {% for link in mgr.managed_stores.all %}
+          <div class="am-store-tag">
+            <i class="fas fa-store-alt"></i> {{ link.store.name }}
+            <form method="POST" action="{% url 'area_manager_assign' %}" style="display:inline;">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="remove">
+              <input type="hidden" name="manager_id" value="{{ mgr.id }}">
+              <input type="hidden" name="link_id" value="{{ link.id }}">
+              <button type="submit" class="am-remove-btn" title="Remove">×</button>
+            </form>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="am-no-stores">No stores assigned. This AM won't appear on any billing screen.</p>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Assignments table -->
+  <div class="table-card">
+    <div class="tc-header">
+      <h3><i class="fas fa-link"></i> All Store Assignments</h3>
+      <span class="badge-count">{{ all_links|length }} assignment(s)</span>
+    </div>
+    <table class="data-table">
+      <thead>
+        <tr><th>Area Manager</th><th>Store</th><th>Assigned On</th><th>Remove</th></tr>
+      </thead>
+      <tbody>
+      {% for link in all_links %}
+      <tr>
+        <td><strong>{{ link.manager.user.get_full_name|default:link.manager.user.username }}</strong></td>
+        <td><i class="fas fa-store-alt" style="color:var(--primary);margin-right:5px;"></i>{{ link.store.name }}</td>
+        <td>{{ link.assigned_at|date:"d M Y, h:i A" }}</td>
+        <td>
+          <form method="POST" action="{% url 'area_manager_assign' %}" style="display:inline;">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="remove">
+            <input type="hidden" name="manager_id" value="{{ link.manager.id }}">
+            <input type="hidden" name="link_id" value="{{ link.id }}">
+            <button type="submit" class="btn-icon-sm red" onclick="return confirm('Remove this assignment?')">
+              <i class="fas fa-unlink"></i>
+            </button>
+          </form>
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="4" class="empty-state"><i class="fas fa-link"></i><p>No assignments yet.</p></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Assign Store Modal -->
+<div class="modal-overlay" id="assignModal">
+  <div class="modal modal-sm">
+    <div class="mhdr">
+      <h3><i class="fas fa-store-alt"></i> Assign Store</h3>
+      <button onclick="closeModal('assignModal')">×</button>
+    </div>
+    <form method="POST" action="{% url 'area_manager_assign' %}" class="mform">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="assign">
+      <input type="hidden" name="manager_id" id="assignManagerId">
+      <p style="font-size:13px;color:var(--muted);margin-bottom:12px;">
+        Assigning stores to: <strong id="assignManagerName"></strong>
+      </p>
+      <div class="fg">
+        <label>Select Store(s)</label>
+        <div class="store-checkbox-list">
+          {% for s in stores %}
+          <label class="store-checkbox-item">
+            <input type="checkbox" name="store_ids" value="{{ s.id }}">
+            <i class="fas fa-store-alt" style="color:var(--primary);"></i> {{ s.name }}
+          </label>
+          {% empty %}
+          <p style="color:var(--muted);font-size:13px;">No active stores found.</p>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="mactions">
+        <button type="button" class="btn-secondary" onclick="closeModal('assignModal')">Cancel</button>
+        <button type="submit" class="btn-primary"><i class="fas fa-plus"></i> Assign</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<style>
+.info-banner{background:#eff6ff;border:1px solid #bfdbfe;border-left:4px solid var(--primary);border-radius:var(--radius-sm);padding:14px 16px;margin-bottom:22px;display:flex;gap:12px;align-items:flex-start;font-size:13px;color:#1e40af;}
+.info-banner i{font-size:18px;flex-shrink:0;margin-top:1px;}
+.am-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px;margin-bottom:24px;}
+.am-card{background:white;border-radius:var(--radius);border:2px solid var(--border);box-shadow:var(--shadow);overflow:hidden;}
+.am-card-hdr{display:flex;align-items:flex-start;gap:12px;padding:14px 16px;border-bottom:1px solid var(--border);background:linear-gradient(135deg,#f8fcff,white);}
+.am-avatar{width:48px;height:48px;background:linear-gradient(135deg,#ede9fe,#f3e8ff);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;color:#7c3aed;flex-shrink:0;}
+.am-info h3{font-size:15px;font-weight:700;margin-bottom:2px;}
+.am-info p{font-size:12px;color:var(--muted);}
+.am-phone{margin-top:3px!important;}
+.am-pin-section{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#f8fcff;border-bottom:1px solid var(--border);}
+.am-pin-info{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);flex:1;}
+.am-pin-info i{color:var(--primary);}
+.no-pin-warn{color:#dc2626;font-weight:600;}
+.am-stores-section{padding:10px 14px;}
+.am-stores-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:13px;font-weight:700;color:var(--primary);}
+.am-store-list{display:flex;flex-wrap:wrap;gap:6px;}
+.am-store-tag{background:#e0f2fe;color:var(--primary);padding:4px 8px 4px 10px;border-radius:14px;font-size:12px;font-weight:600;display:inline-flex;align-items:center;gap:6px;}
+.am-remove-btn{background:none;border:none;color:#64748b;font-size:16px;cursor:pointer;padding:0 1px;line-height:1;}
+.am-remove-btn:hover{color:#dc2626;}
+.am-no-stores{font-size:12px;color:var(--muted);font-style:italic;padding:4px 0;}
+.store-checkbox-list{display:flex;flex-direction:column;gap:7px;max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px;}
+.store-checkbox-item{display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;padding:5px 7px;border-radius:6px;}
+.store-checkbox-item:hover{background:#f0f8ff;}
+.store-checkbox-item input{width:15px;height:15px;accent-color:var(--primary);}
+</style>
+
+{% endblock %}
+{% block extra_js %}
+<script>
+<!-- Removed submitPin logic -->
+
+function openAssign(id, name) {
+  document.getElementById('assignManagerId').value = id;
+  document.getElementById('assignManagerName').textContent = name;
+  document.querySelectorAll('.store-checkbox-list input').forEach(c => c.checked = false);
+  openModal('assignModal');
+}
+</script>
+{% endblock %}

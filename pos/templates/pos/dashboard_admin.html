@@ -1,0 +1,105 @@
+{% extends 'pos/base.html' %}
+{% load static %}
+{% block title %}Admin Dashboard — Ocean Waves{% endblock %}
+{% block content %}
+<div class="pg">
+  <div class="pg-header">
+    <div>
+      <h1><i class="fas fa-network-wired"></i> Admin Dashboard</h1>
+      <p>All-store performance overview · {{ today }}</p>
+    </div>
+    <a href="{% url 'store_list' %}" class="btn-primary"><i class="fas fa-store"></i> Manage Stores</a>
+  </div>
+
+  {% if request.user.profile.role in 'AREAMANAGER,WHOLESALE_EXEC' %}
+    <!-- Surface active OTP requests directly on Area Manager dashboard -->
+    {% include 'pos/components/am_otp_widget.html' %}
+  {% endif %}
+
+  <!-- Global KPIs -->
+  <div class="kpi-grid">
+    <div class="kpi blue">
+      <div class="kpi-icon"><i class="fas fa-store"></i></div>
+      <div class="kpi-body"><span class="kpi-val">{{ total_stores }}</span><span class="kpi-lbl">Active Stores</span></div>
+    </div>
+    <div class="kpi green">
+      <div class="kpi-icon"><i class="fas fa-receipt"></i></div>
+      <div class="kpi-body"><span class="kpi-val">{{ total_bills }}</span><span class="kpi-lbl">Bills Today</span></div>
+    </div>
+    <div class="kpi teal">
+      <div class="kpi-icon"><i class="fas fa-rupee-sign"></i></div>
+      <div class="kpi-body"><span class="kpi-val">₹{{ global_sales|floatformat:0 }}</span><span class="kpi-lbl">Total Sales Today</span></div>
+    </div>
+    <div class="kpi purple">
+      <div class="kpi-icon"><i class="fas fa-chart-line"></i></div>
+      <div class="kpi-body"><span class="kpi-val">₹{{ global_profit|floatformat:0 }}</span><span class="kpi-lbl">Total Profit Today</span></div>
+    </div>
+  </div>
+
+  {% if urgent_credits %}
+  <div style="background-color: #fee2e2; border-left: 4px solid #ef4444; padding: 15px 20px; border-radius: 6px; margin-bottom: 25px; box-shadow: 0 2px 8px rgba(239, 68, 68, 0.15);">
+    <h3 style="color: #b91c1c; margin-top: 0; margin-bottom: 10px; font-size: 16px;">
+      <i class="fas fa-exclamation-triangle"></i> Urgent Credits Dues (Next 48 Hours)
+    </h3>
+    <ul style="margin: 0; padding-left: 20px; color: #7f1d1d; font-size: 14px; line-height: 1.6;">
+      {% for credit in urgent_credits %}
+      <li>
+        <strong>{{ credit.customer.name }}</strong> owes ₹{{ credit.total_due|floatformat:2 }} 
+        <span style="opacity:0.8;">(Due: {{ credit.due_date|date:"d M Y" }})</span> — 
+        <a href="{% url 'credits_list' %}" style="color: #b91c1c; font-weight: bold; text-decoration: underline;">Resolve</a>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  <!-- Per-Store Cards -->
+  <h2 class="section-title"><i class="fas fa-store"></i> Store Performance Today</h2>
+  <div class="store-grid">
+    {% for sd in store_data %}
+    <div class="store-perf-card {% if sd.out_stock > 0 %}has-alert{% endif %}">
+      <div class="spc-header">
+        <div class="spc-name">
+          <i class="fas fa-store-alt"></i>
+          <span>{{ sd.store.name }}</span>
+        </div>
+        <div class="spc-actions">
+          <a href="{% url 'store_detail' sd.store.id %}" class="btn-sm blue"><i class="fas fa-chart-bar"></i> Report</a>
+          <a href="{% url 'store_edit' sd.store.id %}" class="btn-sm grey"><i class="fas fa-cog"></i></a>
+        </div>
+      </div>
+      <div class="spc-kpis">
+        <div class="spc-kpi">
+          <span class="sk-val">{{ sd.bill_count }}</span>
+          <span class="sk-lbl">Bills</span>
+        </div>
+        <div class="spc-kpi">
+          <span class="sk-val">₹{{ sd.total_sales|floatformat:0 }}</span>
+          <span class="sk-lbl">Sales</span>
+        </div>
+        <div class="spc-kpi">
+          <span class="sk-val {% if sd.total_profit >= 0 %}profit-pos{% else %}profit-neg{% endif %}">
+            ₹{{ sd.total_profit|floatformat:0 }}</span>
+          <span class="sk-lbl">Profit</span>
+        </div>
+      </div>
+      {% if sd.low_stock > 0 or sd.out_stock > 0 %}
+      <div class="spc-alerts">
+        {% if sd.out_stock > 0 %}<span class="alert-badge red"><i class="fas fa-times-circle"></i> {{ sd.out_stock }} out of stock</span>{% endif %}
+        {% if sd.low_stock > 0 %}<span class="alert-badge orange"><i class="fas fa-exclamation-triangle"></i> {{ sd.low_stock }} low stock</span>{% endif %}
+      </div>
+      {% endif %}
+      <div class="spc-footer">
+        <span>{{ sd.store.phone }}</span>
+        {% if sd.store.gstin %}<span>GSTIN: {{ sd.store.gstin }}</span>{% endif %}
+      </div>
+    </div>
+    {% empty %}
+    <div class="empty-state" style="grid-column:1/-1">
+      <i class="fas fa-store"></i>
+      <p>No stores yet. <a href="{% url 'store_list' %}">Create your first store →</a></p>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

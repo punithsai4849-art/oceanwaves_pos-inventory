@@ -1,0 +1,49 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Verify OTP — Ocean Waves POS</title>
+<link rel="stylesheet" href="{% static 'pos/css/style.css' %}">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<style>
+.pin-boxes { display: flex; gap: 8px; justify-content: center; margin: 15px 0; }
+.pin-box { width: 45px; height: 50px; font-size: 24px; text-align: center; border: 2px solid #cbd5e1; border-radius: 8px; font-weight: bold; background: white; transition: 0.2s; }
+.pin-box:focus { border-color: #27a4d1; outline: none; box-shadow: 0 0 0 3px rgba(39, 164, 209, 0.2); }
+</style>
+</head>
+<body class="login-page">
+  <div class="login-ocean">
+    <div class="wave w1"></div><div class="wave w2"></div><div class="wave w3"></div>
+  </div>
+  <div class="login-wrap">
+    <div class="login-card">
+      <img src="{% static 'pos/images/logo.jpg' %}" alt="Logo" class="login-logo">
+      <h1>Verify OTP</h1>
+      <p class="login-tagline">We sent a 6-digit code to {{ email }}</p>
+      
+      {% if messages %}{% for m in messages %}
+      <div class="login-error" style="{% if 'success' in m.tags %}color:#16a34a;background:#dcfce7;border-color:#bbf7d0;{% elif 'info' in m.tags %}color:#2563eb;background:#dbeafe;border-color:#bfdbfe;{% endif %}"><i class="fas fa-info-circle"></i> {{ m }}</div>
+      {% endfor %}{% endif %}
+      
+      <form method="POST">
+        {% csrf_token %}
+        <input type="hidden" name="email" value="{{ email }}">
+        
+        <div class="lf-group" style="background:transparent; border:none; padding:0; flex-direction:column;">
+          <label style="text-align:center; display:block; width:100%; font-size:14px; font-weight:600; color:#475569;">Enter Code:</label>
+          <input type="text" name="otp" required pattern="\d{6}" maxlength="6" autofocus 
+                 placeholder="000000" style="font-size: 24px; text-align: center; letter-spacing: 12px; height: 60px; border:2px solid #cbd5e1; border-radius:8px;">
+        </div>
+        
+        <button type="submit" class="login-btn"><i class="fas fa-check-circle"></i> Verify</button>
+      </form>
+      <div style="margin-top: 15px; text-align: center;">
+        <a href="{% url 'forgot_password' %}" style="color: #64748b; font-size: 13px; text-decoration: none;">
+          Didn't receive it? <span style="color:#27a4d1;font-weight:600;">Restart</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

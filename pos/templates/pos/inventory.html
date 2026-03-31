@@ -1,0 +1,388 @@
+{% extends 'pos/base.html' %}
+{% load static %}
+{% block title %}Inventory — {{ store.name }}{% endblock %}
+{% block content %}
+<div class="pg">
+  <div class="pg-header">
+    <div><h1><i class="fas fa-boxes"></i> Inventory — {{ store.name }}</h1><p>Manage products, pricing, and stock</p></div>
+    <div style="display:flex;gap:10px;">
+      <a href="{% url 'stock_log' %}" class="btn-secondary"><i class="fas fa-history"></i> Stock Log</a>
+      {% if profile.is_owner %}
+      <button class="btn-secondary" onclick="openModal('barcodeModal')"><i class="fas fa-barcode"></i> Barcode Scan</button>
+      <button class="btn-primary" onclick="openModal('addProdModal')"><i class="fas fa-plus"></i> Add Product</button>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr)">
+    <div class="kpi blue"><div class="kpi-icon"><i class="fas fa-fish"></i></div><div class="kpi-body"><span class="kpi-val">{{ products.count }}</span><span class="kpi-lbl">Products</span></div></div>
+    <div class="kpi green"><div class="kpi-icon"><i class="fas fa-check-circle"></i></div><div class="kpi-body"><span class="kpi-val" id="inStockCnt">0</span><span class="kpi-lbl">In Stock</span></div></div>
+    <div class="kpi orange"><div class="kpi-icon"><i class="fas fa-exclamation-triangle"></i></div><div class="kpi-body"><span class="kpi-val" id="lowCnt">0</span><span class="kpi-lbl">Low Stock</span></div></div>
+    <div class="kpi red"><div class="kpi-icon"><i class="fas fa-times-circle"></i></div><div class="kpi-body"><span class="kpi-val" id="outCnt">0</span><span class="kpi-lbl">Out of Stock</span></div></div>
+  </div>
+
+  <!-- Filter bar -->
+  <div class="filter-bar">
+    <button class="cf active" data-filter="all" onclick="filterTbl('all',this)">All</button>
+    <button class="cf" data-filter="FISH" onclick="filterTbl('FISH',this)">🐟 Fish</button>
+    <button class="cf" data-filter="PRAWNS" onclick="filterTbl('PRAWNS',this)">🦐 Prawns</button>
+    <button class="cf" data-filter="CRAB" onclick="filterTbl('CRAB',this)">🦀 Crab</button>
+    <button class="cf" data-filter="OTHER" onclick="filterTbl('OTHER',this)">🔹 Other</button>
+    <input type="text" id="tblSearch" class="tbl-search" placeholder="🔍 Search..." oninput="searchTbl()">
+  </div>
+
+  <div class="table-card">
+    <div class="wm-bg"><img src="{% static 'pos/images/logo.jpg' %}" alt=""></div>
+    <table class="data-table" id="prodTbl">
+      <thead>
+        <tr>
+          <th>#</th><th>Product</th><th>Category</th>
+          <th>Cost Price (₹/kg)</th>
+          <th>Retail Price (₹/kg)</th>
+          <th>Wholesale Price (₹/kg)</th>
+          <th>Stock (kg)</th><th>Alert (kg)</th><th>Status</th><th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in products %}
+        <tr data-cat="{{ p.category }}"
+            class="{% if p.is_out_of_stock %}row-red{% elif p.is_low_stock %}row-orange{% endif %}">
+          <td>{{ forloop.counter }}</td>
+          <td><strong>{{ p.name }}</strong></td>
+          <td><span class="cat-badge cat-{{ p.category|lower }}">{{ p.get_category_display }}</span></td>
+          <td class="tr">₹{{ p.cost_price }}</td>
+          <td class="tr">₹{{ p.retail_price }}</td>
+          <td class="tr">₹{{ p.wholesale_price }}</td>
+          <td class="tr">
+            <strong class="{% if p.is_out_of_stock %}text-red{% elif p.is_low_stock %}text-orange{% else %}text-green{% endif %}">
+              {{ p.stock_quantity }}
+            </strong>
+          </td>
+          <td class="tr">{{ p.low_stock_alert }}</td>
+          <td>
+            {% if p.is_out_of_stock %}<span class="pill pill-red">Out</span>
+            {% elif p.is_low_stock %}<span class="pill pill-orange">Low</span>
+            {% else %}<span class="pill pill-green">OK</span>{% endif %}
+          </td>
+          <td style="display:flex;gap:5px;">
+            <button class="btn-icon-sm teal" title="Restock"
+                onclick="openRestock({{ p.id }},'{{ p.name|escapejs }}',{{ p.stock_quantity }})">
+              <i class="fas fa-plus-circle"></i>
+            </button>
+            {% if profile.is_owner %}
+            <button class="btn-icon-sm blue" title="Edit"
+                onclick="openEdit({{ p.id }},'{{ p.name|escapejs }}','{{ p.category }}',{{ p.cost_price }},{{ p.retail_price }},{{ p.wholesale_price }},{{ p.stock_quantity }},{{ p.low_stock_alert }})">
+              <i class="fas fa-edit"></i>
+            </button>
+            <button class="btn-icon-sm red" title="Remove"
+                onclick="confirmDel({{ p.id }},'{{ p.name|escapejs }}')">
+              <i class="fas fa-trash"></i>
+            </button>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="10" class="empty-state"><i class="fas fa-fish"></i><p>No products yet.</p></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Add Product -->
+<div class="modal-overlay" id="addProdModal">
+  <div class="modal">
+    <div class="mhdr"><h3><i class="fas fa-plus-circle"></i> Add New Product</h3><button onclick="closeModal('addProdModal')">×</button></div>
+    <form method="POST" action="{% url 'product_add' %}" class="mform">
+      {% csrf_token %}
+      <div class="frow">
+        <div class="fg"><label>Product Name *</label><input type="text" name="name" required placeholder="e.g. Rohu Fish"></div>
+        <div class="fg"><label>Category *</label>
+          <select name="category">
+            <option value="FISH">🐟 Fish</option><option value="PRAWNS">🦐 Prawns</option>
+            <option value="CRAB">🦀 Crab</option><option value="OTHER">🔹 Other</option>
+          </select>
+        </div>
+      </div>
+      <div class="price-section-label">💰 Pricing (all per kg)</div>
+      <div class="frow frow3">
+        <div class="fg"><label>Cost Price (₹) *</label><input type="number" name="cost_price" step="0.01" min="0" required placeholder="120.00"></div>
+        <div class="fg"><label>Retail Price (₹) *</label><input type="number" name="retail_price" step="0.01" min="0" required placeholder="150.00"></div>
+        <div class="fg"><label>Wholesale Price (₹) *</label><input type="number" name="wholesale_price" step="0.01" min="0" required placeholder="140.00"></div>
+      </div>
+      <div class="frow">
+        <div class="fg"><label>Initial Stock (kg)</label><input type="number" name="stock_quantity" step="0.001" min="0" value="0"></div>
+        <div class="fg"><label>Low Stock Alert (kg)</label><input type="number" name="low_stock_alert" step="0.001" min="0" value="5"></div>
+      </div>
+      <div class="mactions">
+        <button type="button" class="btn-secondary" onclick="closeModal('addProdModal')">Cancel</button>
+        <button type="submit" class="btn-primary"><i class="fas fa-save"></i> Add Product</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Edit Product -->
+<div class="modal-overlay" id="editProdModal">
+  <div class="modal">
+    <div class="mhdr"><h3><i class="fas fa-edit"></i> Edit Product</h3><button onclick="closeModal('editProdModal')">×</button></div>
+    <form id="editProdForm" method="POST" class="mform">
+      {% csrf_token %}
+      <div class="frow">
+        <div class="fg"><label>Product Name *</label><input type="text" name="name" id="epName" required></div>
+        <div class="fg"><label>Category</label>
+          <select name="category" id="epCat">
+            <option value="FISH">🐟 Fish</option><option value="PRAWNS">🦐 Prawns</option>
+            <option value="CRAB">🦀 Crab</option><option value="OTHER">🔹 Other</option>
+          </select>
+        </div>
+      </div>
+      <div class="price-section-label">💰 Pricing (all per kg)</div>
+      <div class="frow frow3">
+        <div class="fg"><label>Cost Price (₹)</label><input type="number" name="cost_price" id="epCP" step="0.01" min="0"></div>
+        <div class="fg"><label>Retail Price (₹)</label><input type="number" name="retail_price" id="epRP" step="0.01" min="0"></div>
+        <div class="fg"><label>Wholesale Price (₹)</label><input type="number" name="wholesale_price" id="epWP" step="0.01" min="0"></div>
+      </div>
+      <div class="fg"><label>Low Stock Alert (kg)</label><input type="number" name="low_stock_alert" id="epAlert" step="0.001" min="0"></div>
+      <div class="mactions">
+        <button type="button" class="btn-secondary" onclick="closeModal('editProdModal')">Cancel</button>
+        <button type="submit" class="btn-primary">Update</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Restock -->
+<div class="modal-overlay" id="restockModal">
+  <div class="modal modal-sm">
+    <div class="mhdr"><h3><i class="fas fa-plus-circle"></i> Restock</h3><button onclick="closeModal('restockModal')">×</button></div>
+    <form id="restockForm" method="POST" class="mform">
+      {% csrf_token %}
+      <div class="restock-info"><p id="rsProdName"></p><p>Current: <strong id="rsCurrent"></strong> kg</p></div>
+      <div class="fg"><label>Add Quantity (kg) *</label><input type="number" name="add_quantity" id="rsQty" step="0.001" min="0.001" required placeholder="25.000"></div>
+      <div class="fg"><label>Note</label><input type="text" name="note" placeholder="e.g. Morning delivery"></div>
+      <div class="mactions">
+        <button type="button" class="btn-secondary" onclick="closeModal('restockModal')">Cancel</button>
+        <button type="submit" class="btn-primary"><i class="fas fa-plus"></i> Add Stock</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Delete confirm -->
+<div class="modal-overlay" id="delProdModal">
+  <div class="modal modal-sm">
+    <div class="mhdr danger"><h3><i class="fas fa-trash"></i> Remove Product</h3><button onclick="closeModal('delProdModal')">×</button></div>
+    <div class="mbody"><p>Remove <strong id="delProdName"></strong>?</p></div>
+    <form id="delProdForm" method="POST" class="mform">
+      {% csrf_token %}
+      <div class="mactions">
+        <button type="button" class="btn-secondary" onclick="closeModal('delProdModal')">Cancel</button>
+        <button type="submit" class="btn-danger">Remove</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Barcode Scanner Modal -->
+<div class="modal-overlay" id="barcodeModal">
+  <div class="modal">
+    <div class="mhdr">
+      <h3><i class="fas fa-barcode"></i> Barcode Scanner — Add Product</h3>
+      <button onclick="closeModal('barcodeModal');stopScanner()">×</button>
+    </div>
+    <div class="mform">
+      <div class="barcode-info">
+        <i class="fas fa-info-circle"></i>
+        Point your barcode scanner or phone camera at a product barcode.
+        The barcode number will be used as the product identifier.
+      </div>
+
+      <!-- Camera scanner -->
+      <div id="scannerWrap" style="display:none;">
+        <video id="scannerVideo" style="width:100%;border-radius:8px;background:#000;" autoplay playsinline></video>
+        <canvas id="scannerCanvas" style="display:none;"></canvas>
+        <div class="scan-overlay"><div class="scan-line"></div></div>
+        <button class="btn-secondary" style="width:100%;margin-top:8px;" onclick="stopScanner();document.getElementById('scannerWrap').style.display='none';">
+          <i class="fas fa-stop"></i> Stop Camera
+        </button>
+      </div>
+
+      <!-- Manual barcode entry + camera button -->
+      <div style="display:flex;gap:8px;margin-bottom:14px;">
+        <input type="text" id="barcodeInput" placeholder="Scan or type barcode number..."
+               class="fg" style="flex:1;padding:10px 14px;border:2px solid var(--border);border-radius:8px;font-size:14px;"
+               oninput="onBarcodeInput(this.value)">
+        <button class="btn-secondary" onclick="startCamera()" title="Use camera">
+          <i class="fas fa-camera"></i>
+        </button>
+      </div>
+
+      <div id="barcodeScanned" style="display:none;" class="barcode-found">
+        <i class="fas fa-check-circle"></i>
+        Barcode: <strong id="barcodeVal"></strong>
+      </div>
+
+      <!-- Product form pre-filled after scan -->
+      <form method="POST" action="{% url 'product_add' %}" id="barcodeProductForm">
+        {% csrf_token %}
+        <input type="hidden" name="barcode" id="hiddenBarcode">
+        <div class="fg"><label>Product Name *</label><input type="text" name="name" id="bpName" required placeholder="e.g. Rohu Fish"></div>
+        <div class="fg"><label>Category *</label>
+          <select name="category" id="bpCat">
+            <option value="FISH">🐟 Fish</option><option value="PRAWNS">🦐 Prawns</option>
+            <option value="CRAB">🦀 Crab</option><option value="OTHER">🔹 Other</option>
+          </select>
+        </div>
+        <div class="price-section-label">💰 Pricing (per kg)</div>
+        <div class="frow frow3">
+          <div class="fg"><label>Cost Price *</label><input type="number" name="cost_price" step="0.01" min="0" required placeholder="120.00"></div>
+          <div class="fg"><label>Retail Price *</label><input type="number" name="retail_price" step="0.01" min="0" required placeholder="150.00"></div>
+          <div class="fg"><label>Wholesale Price *</label><input type="number" name="wholesale_price" step="0.01" min="0" required placeholder="140.00"></div>
+        </div>
+        <div class="frow">
+          <div class="fg"><label>Initial Stock (kg)</label><input type="number" name="stock_quantity" step="0.001" min="0" value="0"></div>
+          <div class="fg"><label>Low Stock Alert (kg)</label><input type="number" name="low_stock_alert" step="0.001" min="0" value="5"></div>
+        </div>
+        <div class="mactions">
+          <button type="button" class="btn-secondary" onclick="closeModal('barcodeModal');stopScanner()">Cancel</button>
+          <button type="submit" class="btn-primary"><i class="fas fa-save"></i> Add Product</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<style>
+.barcode-info{background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 14px;font-size:12px;color:#1e40af;margin-bottom:14px;display:flex;gap:8px;align-items:flex-start;}
+.barcode-found{background:#dcfce7;border:1px solid #bbf7d0;border-radius:8px;padding:10px 14px;font-size:13px;color:#15803d;margin-bottom:12px;display:flex;align-items:center;gap:8px;}
+.scan-overlay{position:relative;margin-top:-4px;}
+.scan-line{height:2px;background:#0077B6;animation:scan 2s linear infinite;}
+@keyframes scan{0%{transform:translateY(0)}50%{transform:translateY(80px)}100%{transform:translateY(0)}}
+</style>
+
+{% endblock %}
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  let low=0, out=0, ok=0;
+  document.querySelectorAll('#prodTbl tbody tr[data-cat]').forEach(r => {
+    if(r.classList.contains('row-red')) out++;
+    else if(r.classList.contains('row-orange')) low++;
+    else ok++;
+  });
+  document.getElementById('inStockCnt').textContent = ok;
+  document.getElementById('lowCnt').textContent = low;
+  document.getElementById('outCnt').textContent = out;
+});
+function filterTbl(cat, btn) {
+  document.querySelectorAll('.cf').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('#prodTbl tbody tr[data-cat]').forEach(r => {
+    r.style.display = (cat==='all'||r.dataset.cat===cat)?'':'none';
+  });
+}
+function searchTbl() {
+  const q = document.getElementById('tblSearch').value.toLowerCase();
+  document.querySelectorAll('#prodTbl tbody tr[data-cat]').forEach(r=>{
+    r.style.display = r.textContent.toLowerCase().includes(q)?'':'none';
+  });
+}
+function openEdit(id,name,cat,cp,rp,wp,stock,alert) {
+  document.getElementById('epName').value=name;
+  document.getElementById('epCat').value=cat;
+  document.getElementById('epCP').value=cp;
+  document.getElementById('epRP').value=rp;
+  document.getElementById('epWP').value=wp;
+  document.getElementById('epAlert').value=alert;
+  document.getElementById('editProdForm').action=`/inventory/${id}/edit/`;
+  openModal('editProdModal');
+}
+function openRestock(id,name,stock) {
+  document.getElementById('rsProdName').textContent=name;
+  document.getElementById('rsCurrent').textContent=stock;
+  document.getElementById('rsQty').value='';
+  document.getElementById('restockForm').action=`/inventory/${id}/restock/`;
+  openModal('restockModal');
+}
+function confirmDel(id,name) {
+  document.getElementById('delProdName').textContent=name;
+  document.getElementById('delProdForm').action=`/inventory/${id}/delete/`;
+  openModal('delProdModal');
+}
+document.querySelectorAll('.modal-overlay').forEach(o=>o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('active');}));
+
+// ── Barcode Scanner ──────────────────────────────────────────────────────────
+let scanStream = null;
+let scanInterval = null;
+
+function onBarcodeInput(val) {
+  if (val.length >= 4) {
+    document.getElementById('barcodeVal').textContent = val;
+    document.getElementById('barcodeScanned').style.display = '';
+    document.getElementById('hiddenBarcode').value = val;
+    // Pre-fill product name with barcode as placeholder
+    if (!document.getElementById('bpName').value) {
+      document.getElementById('bpName').placeholder = 'Enter product name for barcode: ' + val;
+    }
+  } else {
+    document.getElementById('barcodeScanned').style.display = 'none';
+  }
+}
+
+// Physical barcode scanner support (sends Enter after scan)
+document.getElementById('barcodeInput').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    const val = this.value.trim();
+    if (val) {
+      onBarcodeInput(val);
+      document.getElementById('bpName').focus();
+    }
+  }
+});
+
+async function startCamera() {
+  document.getElementById('scannerWrap').style.display = '';
+  try {
+    scanStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment' }
+    });
+    document.getElementById('scannerVideo').srcObject = scanStream;
+
+    // Try to use BarcodeDetector API (supported in Chrome/Edge on Android)
+    if ('BarcodeDetector' in window) {
+      const detector = new BarcodeDetector({ formats: ['ean_13','ean_8','code_128','code_39','qr_code','upc_a','upc_e'] });
+      const video = document.getElementById('scannerVideo');
+      scanInterval = setInterval(async () => {
+        try {
+          const barcodes = await detector.detect(video);
+          if (barcodes.length > 0) {
+            const code = barcodes[0].rawValue;
+            document.getElementById('barcodeInput').value = code;
+            onBarcodeInput(code);
+            stopScanner();
+            document.getElementById('scannerWrap').style.display = 'none';
+          }
+        } catch(e) {}
+      }, 500);
+    } else {
+      // Fallback: show camera but user needs USB/bluetooth scanner
+      setTimeout(() => {
+        alert('Camera started. If you have a USB/Bluetooth barcode scanner, scan now.\n\nFor camera-based scanning, use Chrome on Android.');
+      }, 1000);
+    }
+  } catch(err) {
+    alert('Camera access denied. Please use a USB/Bluetooth barcode scanner instead — just click the barcode field and scan.');
+    document.getElementById('scannerWrap').style.display = 'none';
+  }
+}
+
+function stopScanner() {
+  if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
+  if (scanStream) { scanStream.getTracks().forEach(t => t.stop()); scanStream = null; }
+}
+
+</script>
+{% endblock %}

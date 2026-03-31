@@ -1,0 +1,316 @@
+{% extends 'pos/base.html' %}
+{% load static %}
+{% block title %}Users — Ocean Waves Admin{% endblock %}
+{% block content %}
+<div class="pg">
+  <div class="pg-header">
+    <div><h1><i class="fas fa-users-cog"></i> User Management</h1><p>Assign users to stores and manage roles</p></div>
+    <button class="btn-primary" onclick="openModal('addUserModal')"><i class="fas fa-user-plus"></i> Create User</button>
+  </div>
+
+  <!-- Users by store grouping -->
+  {% regroup users by store as store_groups %}
+  {% for sg in store_groups %}
+  <div class="table-card" style="margin-bottom:20px;">
+    <div class="tc-header">
+      <h3><i class="fas fa-store-alt"></i> {{ sg.grouper|default:"No Store Assigned" }}</h3>
+      <span class="badge-count">{{ sg.list|length }} user(s)</span>
+    </div>
+    <table class="data-table">
+      <thead><tr><th>Name</th><th>Username</th><th>Email</th><th>Role</th><th>Phone</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody>
+      {% for up in sg.list %}
+      <tr>
+        <td><strong>{{ up.user.get_full_name|default:"—" }}</strong></td>
+        <td>{{ up.user.username }}</td>
+        <td>{{ up.user.email|default:"<span style='color:#999;font-size:12px;'>No email</span>"|safe }}</td>
+        <td>
+          <span class="role-pill role-{{ up.role|lower }}">{{ up.get_role_display }}</span>
+        </td>
+        <td>{{ up.phone|default:"—" }}</td>
+        <td>{% if up.is_active %}<span class="pill pill-green">Active</span>{% else %}<span class="pill pill-red">Inactive</span>{% endif %}</td>
+        <td style="display:flex;gap:6px;">
+          <button class="btn-icon-sm blue" title="Edit"
+            data-id="{{ up.id }}"
+            data-fn="{{ up.user.first_name }}"
+            data-ln="{{ up.user.last_name }}"
+            data-role="{{ up.role }}"
+            data-email="{{ up.user.email|default:'' }}"
+            data-store="{{ up.store_id|default:'' }}"
+            data-active="{{ up.is_active|lower }}"
+            data-phone="{{ up.phone }}"
+            data-expires="{{ up.expires_at|date:'Y-m-d\TH:i'|default:'' }}"
+            data-perm-users="{% if up.permissions.manage_users %}true{% endif %}"
+            data-perm-reports="{% if up.permissions.view_reports %}true{% endif %}"
+            data-perm-inv="{% if up.permissions.manage_inventory %}true{% endif %}"
+            onclick="openEditUserWithData(this)">
+            <i class="fas fa-edit"></i>
+          </button>
+          {% if up.role in 'AREAMANAGER,WHOLESALE_EXEC' %}
+          <a href="{% url 'area_manager_list' %}" class="btn-icon-sm teal" title="Manage PIN & Stores">
+            <i class="fas fa-user-shield"></i>
+          </a>
+          {% endif %}
+          {% if up.user != request.user %}
+          <button class="btn-icon-sm red" title="Delete" onclick="confirmDeleteUser({{ up.id }}, '{{ up.user.username|escapejs }}')">
+            <i class="fas fa-trash"></i>
+          </button>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endfor %}
+
+  {% if not users %}
+  <div class="empty-state" style="padding:48px;">
+    <i class="fas fa-users"></i><p>No users yet. Create your first user above.</p>
+  </div>
+  {% endif %}
+
+  <!-- Role guide -->
+  <div class="role-guide">
+    <h3>Role Permissions</h3>
+    <div class="role-cards" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr));">
+      <div class="role-card sa">
+        <h4><i class="fas fa-shield-alt"></i> Super Admin</h4>
+        <ul>
+          <li>✅ View ALL stores globally</li>
+          <li>✅ Create & manage stores</li>
+          <li>✅ Create & assign users</li>
+          <li>✅ Set Area Manager PINs</li>
+          <li>✅ View all reports & export</li>
+          <li>❌ Cannot bill (admin only)</li>
+        </ul>
+      </div>
+      <div class="role-card ow">
+        <h4><i class="fas fa-crown"></i> Store Owner</h4>
+        <ul>
+          <li>✅ Full access in their store</li>
+          <li>✅ Retail & wholesale billing</li>
+          <li>✅ Inventory management</li>
+          <li>✅ Reports + Excel export</li>
+          <li>✅ Record expenses</li>
+          <li>❌ Cannot manage other stores</li>
+        </ul>
+      </div>
+      <div class="role-card" style="border-color:#0d9488;">
+        <h4 style="color:#0d9488;"><i class="fas fa-user-shield"></i> Area Manager</h4>
+        <ul>
+          <li>✅ Approves wholesale bills via PIN</li>
+          <li>✅ Can be assigned to multiple stores</li>
+          <li>✅ Has a secret 4–6 digit approval PIN</li>
+          <li>✅ All approvals are logged with name</li>
+          <li>❌ Cannot bill or access inventory</li>
+          <li>❌ Cannot view reports</li>
+        </ul>
+      </div>
+      <div class="role-card st">
+        <h4><i class="fas fa-user"></i> Staff</h4>
+        <ul>
+          <li>✅ Retail & wholesale billing</li>
+          <li>✅ View & restock inventory</li>
+          <li>❌ Cannot view reports</li>
+          <li>❌ Cannot delete products</li>
+          <li>❌ Cannot manage users</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Create User Modal ── -->
+<div class="modal-overlay" id="addUserModal">
+  <div class="modal">
+    <div class="mhdr"><h3><i class="fas fa-user-plus"></i> Create New User</h3><button onclick="closeModal('addUserModal')">×</button></div>
+    <form method="POST" action="{% url 'user_create' %}" class="mform">
+      {% csrf_token %}
+      <div class="frow">
+        <div class="fg"><label>First Name</label><input type="text" name="first_name" placeholder="First"></div>
+        <div class="fg"><label>Last Name</label><input type="text" name="last_name" placeholder="Last"></div>
+      </div>
+      <div class="fg"><label>Username *</label><input type="text" name="username" required placeholder="login username (no spaces)"></div>
+      <div class="fg"><label>Email Address *</label><input type="email" name="email" required placeholder="name@domain.com"></div>
+      <div class="fg"><label>Password *</label><input type="password" name="password" required placeholder="minimum 6 characters"></div>
+      <div class="fg"><label>Phone Number</label><input type="text" name="phone" placeholder="e.g. +91 9876543210"></div>
+      <div class="frow">
+        <div class="fg">
+          <label>Role *</label>
+          <select name="role" id="createRoleSelect" required onchange="toggleStoreField('create')">
+            <option value="STAFF">👤 Staff</option>
+            <option value="OWNER">👑 Store Owner</option>
+            <option value="AREAMANAGER">🛡️ Area Manager</option>
+            <option value="WHOLESALE_EXEC">📦 Wholesale Exec</option>
+            <option value="SUBADMIN">🛠️ Sub-Admin</option>
+            <option value="SUPERADMIN">🔐 Super Admin</option>
+          </select>
+        </div>
+        <div class="fg" id="createStoreField">
+          <label>Assign to Store</label>
+          <select name="store_id">
+            <option value="">— No Store —</option>
+            {% for s in stores %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="frow">
+        <div class="fg">
+          <label>Temporary Expiration (Optional)</label>
+          <input type="datetime-local" name="expires_at" style="color:var(--text);">
+        </div>
+      </div>
+      <div id="createPermissionsDiv" style="display:none; background:#f0f8ff; padding:12px; border-radius:8px; margin-bottom:12px;">
+        <label style="font-size:12px; font-weight:bold; color:var(--primary); margin-bottom:8px; display:block;">Sub-Admin Permissions</label>
+        <div class="frow">
+          <div class="fg checkbox-fg"><label><input type="checkbox" name="perm_manage_users"> Manage Users</label></div>
+          <div class="fg checkbox-fg"><label><input type="checkbox" name="perm_view_reports"> View Reports</label></div>
+          <div class="fg checkbox-fg"><label><input type="checkbox" name="perm_manage_inventory"> Global Inventory</label></div>
+        </div>
+      </div>
+      <div class="am-note" id="createAMNote" style="display:none;">
+        <i class="fas fa-info-circle"></i>
+        Area Managers are not restricted to one store. After creating, go to
+        <strong>Area Managers</strong> page to assign stores and set their approval PIN.
+      </div>
+      <div class="mactions">
+        <button type="button" class="btn-secondary" onclick="closeModal('addUserModal')">Cancel</button>
+        <button type="submit" class="btn-primary"><i class="fas fa-save"></i> Create User</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ── Edit User Modal ── -->
+<div class="modal-overlay" id="editUserModal">
+  <div class="modal">
+    <div class="mhdr"><h3><i class="fas fa-user-edit"></i> Edit User</h3><button onclick="closeModal('editUserModal')">×</button></div>
+    <form id="editUserForm" method="POST" class="mform">
+      {% csrf_token %}
+      <div class="frow">
+        <div class="fg"><label>First Name</label><input type="text" name="first_name" id="euFN"></div>
+        <div class="fg"><label>Last Name</label><input type="text" name="last_name" id="euLN"></div>
+      </div>
+      <div class="frow">
+        <div class="fg"><label>Email Address</label><input type="email" name="email" id="euEmail" placeholder="name@domain.com"></div>
+        <div class="fg"><label>Phone Number</label><input type="text" name="phone" id="euPhone" placeholder="+91 9876543210"></div>
+      </div>
+      <div class="frow">
+        <div class="fg">
+          <label>Role</label>
+          <select name="role" id="euRole" onchange="toggleStoreField('edit')">
+            <option value="STAFF">👤 Staff</option>
+            <option value="OWNER">👑 Store Owner</option>
+            <option value="AREAMANAGER">🛡️ Area Manager</option>
+            <option value="WHOLESALE_EXEC">📦 Wholesale Exec</option>
+            <option value="SUBADMIN">🛠️ Sub-Admin</option>
+            <option value="SUPERADMIN">🔐 Super Admin</option>
+          </select>
+        </div>
+        <div class="fg" id="editStoreField">
+          <label>Store</label>
+          <select name="store_id" id="euStore">
+            <option value="">— No Store —</option>
+            {% for s in stores %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="frow">
+        <div class="fg">
+          <label>Password (Leave blank to keep)</label>
+          <input type="password" name="password" placeholder="New password">
+        </div>
+        <div class="fg">
+          <label>Temporary Expiration</label>
+          <input type="datetime-local" name="expires_at" id="euExpires" style="color:var(--text);">
+        </div>
+      </div>
+      <div id="editPermissionsDiv" style="display:none; background:#f0f8ff; padding:12px; border-radius:8px; margin-bottom:12px;">
+        <label style="font-size:12px; font-weight:bold; color:var(--primary); margin-bottom:8px; display:block;">Sub-Admin Permissions</label>
+        <div class="frow">
+          <div class="fg checkbox-fg"><label><input type="checkbox" name="perm_manage_users" id="ePermUsers"> Manage Users</label></div>
+          <div class="fg checkbox-fg"><label><input type="checkbox" name="perm_view_reports" id="ePermReports"> View Reports</label></div>
+          <div class="fg checkbox-fg"><label><input type="checkbox" name="perm_manage_inventory" id="ePermInv"> Global Inventory</label></div>
+        </div>
+      </div>
+      <div class="am-note" id="editAMNote" style="display:none;">
+        <i class="fas fa-info-circle"></i>
+        After saving, go to <a href="{% url 'area_manager_list' %}">Area Managers</a> page to assign stores and set PIN.
+      </div>
+      <div class="fg checkbox-fg">
+        <label><input type="checkbox" name="is_active" id="euActive"> User is Active</label>
+      </div>
+      <div class="mactions">
+        <button type="button" class="btn-secondary" onclick="closeModal('editUserModal')">Cancel</button>
+        <button type="submit" class="btn-primary">Update</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ── Delete confirm ── -->
+<div class="modal-overlay" id="deleteUserModal">
+  <div class="modal modal-sm">
+    <div class="mhdr danger"><h3><i class="fas fa-user-times"></i> Delete User</h3><button onclick="closeModal('deleteUserModal')">×</button></div>
+    <div class="mbody"><p>Delete <strong id="delUName"></strong>? This cannot be undone.</p></div>
+    <form id="deleteUserForm" method="POST" class="mform">
+      {% csrf_token %}
+      <div class="mactions">
+        <button type="button" class="btn-secondary" onclick="closeModal('deleteUserModal')">Cancel</button>
+        <button type="submit" class="btn-danger">Delete</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<style>
+.am-note{background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 12px;font-size:12px;color:#1e40af;margin-top:4px;margin-bottom:8px;display:flex;gap:8px;align-items:flex-start;}
+.am-note i{flex-shrink:0;margin-top:1px;}
+.am-note a{color:var(--primary);font-weight:700;}
+.role-pill.role-areamanager{background:#ccfbf1;color:#0d9488;}
+</style>
+
+{% endblock %}
+{% block extra_js %}
+<script>
+function toggleStoreField(mode) {
+  const role     = document.getElementById(mode === 'create' ? 'createRoleSelect' : 'euRole').value;
+  const storeDiv = document.getElementById(mode === 'create' ? 'createStoreField' : 'editStoreField');
+  const noteDiv  = document.getElementById(mode === 'create' ? 'createAMNote' : 'editAMNote');
+  const permDiv  = document.getElementById(mode === 'create' ? 'createPermissionsDiv' : 'editPermissionsDiv');
+  // Area Managers, Wholesale Execs, and Admins don't need a single store assigned
+  const noStore  = (role === 'AREAMANAGER' || role === 'SUPERADMIN' || role === 'WHOLESALE_EXEC' || role === 'SUBADMIN');
+  storeDiv.style.opacity = noStore ? '0.4' : '1';
+  storeDiv.style.pointerEvents = noStore ? 'none' : '';
+  noteDiv.style.display = (role === 'AREAMANAGER' || role === 'WHOLESALE_EXEC') ? '' : 'none';
+  permDiv.style.display = role === 'SUBADMIN' ? 'block' : 'none';
+}
+
+function openEditUserWithData(btn) {
+  const d = btn.dataset;
+  document.getElementById('euFN').value     = d.fn || '';
+  document.getElementById('euLN').value     = d.ln || '';
+  document.getElementById('euEmail').value  = d.email || '';
+  document.getElementById('euRole').value   = d.role || '';
+  document.getElementById('euStore').value  = d.store || '';
+  document.getElementById('euActive').checked = (d.active === 'true');
+  document.getElementById('euPhone').value  = d.phone || '';
+  document.getElementById('euExpires').value = d.expires || '';
+  
+  document.getElementById('ePermUsers').checked   = (d.permUsers === 'true');
+  document.getElementById('ePermReports').checked = (d.permReports === 'true');
+  document.getElementById('ePermInv').checked     = (d.permInv === 'true');
+
+  document.getElementById('editUserForm').action = `/users/${d.id}/edit/`;
+  toggleStoreField('edit');
+  openModal('editUserModal');
+}
+
+function confirmDeleteUser(id, name) {
+  document.getElementById('delUName').textContent = name;
+  document.getElementById('deleteUserForm').action = `/users/${id}/delete/`;
+  openModal('deleteUserModal');
+}
+</script>
+{% endblock %}

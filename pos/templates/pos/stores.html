@@ -1,0 +1,100 @@
+{% extends 'pos/base.html' %}
+{% load static %}
+{% block title %}Stores — Ocean Waves Admin{% endblock %}
+{% block content %}
+<div class="pg">
+  <div class="pg-header">
+    <div><h1><i class="fas fa-store"></i> Store Management</h1><p>Create and manage all store locations</p></div>
+    <button class="btn-primary" onclick="openModal('addStoreModal')"><i class="fas fa-plus"></i> Add Store</button>
+  </div>
+
+  <div class="store-cards-grid">
+    {% for s in stores %}
+    <div class="store-card {% if not s.is_active %}inactive{% endif %}">
+      <div class="sc-logo">
+        <img src="{% static 'pos/images/logo.jpg' %}" alt="">
+      </div>
+      <div class="sc-info">
+        <h3>{{ s.name }}</h3>
+        {% if s.address %}<p><i class="fas fa-map-marker-alt"></i> {{ s.address }}</p>{% endif %}
+        {% if s.phone   %}<p><i class="fas fa-phone"></i> {{ s.phone }}</p>{% endif %}
+        {% if s.whatsapp_number %}<p style="color:#25D366;"><i class="fab fa-whatsapp"></i> {{ s.whatsapp_number }}</p>{% endif %}
+        {% if s.gstin   %}<p><i class="fas fa-file-invoice"></i> GSTIN: {{ s.gstin }}</p>{% endif %}
+      </div>
+      <div class="sc-stats">
+        <div class="sc-stat"><span>{{ s.staff_count }}</span><small>Staff</small></div>
+        <div class="sc-stat"><span>{{ s.product_count }}</span><small>Products</small></div>
+      </div>
+      <div class="sc-actions">
+        <a href="{% url 'store_detail' s.id %}" class="btn-sm blue"><i class="fas fa-chart-bar"></i> Report</a>
+        <button class="btn-sm grey" onclick="openEditStore({{ s.id }}, '{{ s.name|escapejs }}', '{{ s.address|escapejs }}', '{{ s.phone|escapejs }}', '{{ s.whatsapp_number|escapejs }}', '{{ s.email|escapejs }}', '{{ s.gstin|escapejs }}', {{ s.is_active|lower }})">
+          <i class="fas fa-edit"></i> Edit
+        </button>
+      </div>
+      {% if not s.is_active %}<div class="inactive-badge">Inactive</div>{% endif %}
+    </div>
+    {% empty %}
+    <div class="empty-state" style="grid-column:1/-1">
+      <i class="fas fa-store"></i><p>No stores yet. Create your first store!</p>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- Add Store Modal -->
+<div class="modal-overlay" id="addStoreModal">
+  <div class="modal">
+    <div class="mhdr"><h3><i class="fas fa-plus-circle"></i> Create New Store</h3><button onclick="closeModal('addStoreModal')">×</button></div>
+    <form method="POST" action="{% url 'store_create' %}" class="mform">
+      {% csrf_token %}
+      <div class="fg"><label>Store Name *</label><input type="text" name="name" required placeholder="e.g. Ocean Waves - Banjara Hills"></div>
+      <div class="fg"><label>Address</label><textarea name="address" rows="2" placeholder="Full store address"></textarea></div>
+      <div class="frow">
+      <div class="fg"><label>Phone</label><input type="text" name="phone" placeholder="Contact number"></div>
+        <div class="fg"><label><i class="fab fa-whatsapp" style="color:#25D366"></i> WhatsApp Number</label><input type="text" name="whatsapp_number" placeholder="e.g. 919876543210 (with country code)"></div>
+        <div class="fg"><label>Email</label><input type="email" name="email" placeholder="store@email.com"></div>
+      </div>
+      <div class="fg"><label>GSTIN</label><input type="text" name="gstin" placeholder="GST number for this store"></div>
+      <div class="mactions"><button type="button" class="btn-secondary" onclick="closeModal('addStoreModal')">Cancel</button><button type="submit" class="btn-primary"><i class="fas fa-save"></i> Create Store</button></div>
+    </form>
+  </div>
+</div>
+
+<!-- Edit Store Modal -->
+<div class="modal-overlay" id="editStoreModal">
+  <div class="modal">
+    <div class="mhdr"><h3><i class="fas fa-edit"></i> Edit Store</h3><button onclick="closeModal('editStoreModal')">×</button></div>
+    <form id="editStoreForm" method="POST" class="mform">
+      {% csrf_token %}
+      <div class="fg"><label>Store Name *</label><input type="text" name="name" id="esName" required></div>
+      <div class="fg"><label>Address</label><textarea name="address" id="esAddress" rows="2"></textarea></div>
+      <div class="frow">
+        <div class="fg"><label>Phone</label><input type="text" name="phone" id="esPhone"></div>
+        <div class="fg"><label><i class="fab fa-whatsapp" style="color:#25D366"></i> WhatsApp Number</label><input type="text" name="whatsapp_number" id="esWhatsapp" placeholder="e.g. 919876543210"></div>
+        <div class="fg"><label>Email</label><input type="email" name="email" id="esEmail"></div>
+      </div>
+      <div class="fg"><label>GSTIN</label><input type="text" name="gstin" id="esGstin"></div>
+      <div class="fg checkbox-fg">
+        <label><input type="checkbox" name="is_active" id="esActive"> Store is Active</label>
+      </div>
+      <div class="mactions"><button type="button" class="btn-secondary" onclick="closeModal('editStoreModal')">Cancel</button><button type="submit" class="btn-primary">Update</button></div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
+{% block extra_js %}
+<script>
+function openEditStore(id, name, addr, phone, whatsapp, email, gstin, active) {
+  document.getElementById('esName').value = name;
+  document.getElementById('esAddress').value = addr;
+  document.getElementById('esPhone').value = phone;
+  document.getElementById('esWhatsapp').value = whatsapp;
+  document.getElementById('esEmail').value = email;
+  document.getElementById('esGstin').value = gstin;
+  document.getElementById('esActive').checked = active;
+  document.getElementById('editStoreForm').action = `/stores/${id}/edit/`;
+  openModal('editStoreModal');
+}
+</script>
+{% endblock %}

@@ -1,0 +1,125 @@
+{% extends 'pos/base.html' %}
+{% load static %}
+{% block title %}Dashboard — {{ store.name }}{% endblock %}
+{% block content %}
+<div class="pg">
+  <div class="pg-header">
+    <div>
+      <h1><i class="fas fa-store-alt"></i> {{ store.name }}</h1>
+      <p>{{ store.address }} {% if store.phone %}· {{ store.phone }}{% endif %}</p>
+    </div>
+    {% if profile.is_owner %}
+    <a href="{% url 'billing' %}" class="btn-primary btn-lg"><i class="fas fa-plus"></i> New Bill</a>
+    {% endif %}
+  </div>
+
+  {% if urgent_credits %}
+  <div style="background-color: #fee2e2; border-left: 4px solid #ef4444; padding: 15px 20px; border-radius: 6px; margin-bottom: 25px; box-shadow: 0 2px 8px rgba(239, 68, 68, 0.15);">
+    <h3 style="color: #b91c1c; margin-top: 0; margin-bottom: 10px; font-size: 16px;">
+      <i class="fas fa-exclamation-triangle"></i> Urgent Credits Dues (Next 48 Hours)
+    </h3>
+    <ul style="margin: 0; padding-left: 20px; color: #7f1d1d; font-size: 14px; line-height: 1.6;">
+      {% for credit in urgent_credits %}
+      <li>
+        <strong>{{ credit.customer.name }}</strong> owes ₹{{ credit.total_due|floatformat:2 }} 
+        <span style="opacity:0.8;">(Due: {{ credit.due_date|date:"d M Y" }})</span> — 
+        <a href="{% url 'credits_list' %}" style="color: #b91c1c; font-weight: bold; text-decoration: underline;">Resolve</a>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  <!-- Today KPIs -->
+  <h3 class="section-title">📅 Today's Summary</h3>
+  <div class="kpi-grid">
+    <div class="kpi blue">
+      <div class="kpi-icon"><i class="fas fa-receipt"></i></div>
+      <div class="kpi-body"><span class="kpi-val">{{ today_bills }}</span><span class="kpi-lbl">Bills Today</span></div>
+    </div>
+    <div class="kpi green">
+      <div class="kpi-icon"><i class="fas fa-rupee-sign"></i></div>
+      <div class="kpi-body"><span class="kpi-val">₹{{ today_sales|floatformat:0 }}</span><span class="kpi-lbl">Sales Today</span></div>
+    </div>
+    <div class="kpi orange">
+      <div class="kpi-icon"><i class="fas fa-shopping-cart"></i></div>
+      <div class="kpi-body"><span class="kpi-val">₹{{ today_cost|floatformat:0 }}</span><span class="kpi-lbl">Cost Today</span></div>
+    </div>
+    <div class="kpi {% if today_profit >= 0 %}teal{% else %}red{% endif %}">
+      <div class="kpi-icon"><i class="fas fa-chart-line"></i></div>
+      <div class="kpi-body"><span class="kpi-val">₹{{ today_profit|floatformat:0 }}</span><span class="kpi-lbl">Profit Today</span></div>
+    </div>
+  </div>
+
+  <div class="dash-grid2">
+    <!-- Recent Bills -->
+    <div class="dash-card">
+      <div class="dc-header">
+        <h3><i class="fas fa-clock"></i> Recent Bills</h3>
+        {% if profile.is_owner %}<a href="{% url 'reports' %}" class="btn-sm blue">View All</a>{% endif %}
+      </div>
+      <table class="mini-table">
+        <thead><tr><th>Bill #</th><th>Type</th><th>Amount</th><th>Time</th></tr></thead>
+        <tbody>
+        {% for s in recent_sales %}
+        <tr>
+          <td><strong>{{ s.bill_number }}</strong></td>
+          <td><span class="pill {% if s.bill_type == 'WHOLESALE' %}pill-blue{% else %}pill-green{% endif %}">{{ s.bill_type }}</span></td>
+          <td>₹{{ s.grand_total }}</td>
+          <td>{{ s.created_at|date:"h:i A" }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4" class="empty-mini">No bills today</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Stock Alerts -->
+    <div class="dash-card">
+      <div class="dc-header">
+        <h3><i class="fas fa-exclamation-triangle"></i> Stock Alerts</h3>
+        <a href="{% url 'inventory' %}" class="btn-sm orange">Manage</a>
+      </div>
+      {% if out_count > 0 %}
+      <div class="alert-banner red"><i class="fas fa-times-circle"></i> {{ out_count }} product(s) out of stock!</div>
+      {% endif %}
+      {% if low_count > 0 %}
+      <div class="alert-banner orange"><i class="fas fa-exclamation-triangle"></i> {{ low_count }} product(s) running low</div>
+      {% endif %}
+      <table class="mini-table">
+        <thead><tr><th>Product</th><th>Category</th><th>Stock</th><th>Status</th></tr></thead>
+        <tbody>
+        {% for p in low_products %}
+        <tr>
+          <td><strong>{{ p.name }}</strong></td>
+          <td>{{ p.get_category_display }}</td>
+          <td>{{ p.stock_quantity }} kg</td>
+          <td>
+            {% if p.is_out_of_stock %}<span class="pill pill-red">Out</span>
+            {% else %}<span class="pill pill-orange">Low</span>{% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4" class="empty-mini">✅ All stock levels healthy</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Week summary -->
+  {% if profile.is_owner %}
+  <div class="week-banner">
+    <i class="fas fa-calendar-week"></i>
+    <span>This week (last 7 days):</span>
+    <strong>Sales ₹{{ week_sales|floatformat:0 }}</strong>
+    <span class="sep">|</span>
+    <strong class="{% if week_profit >= 0 %}profit-pos{% else %}profit-neg{% endif %}">
+      Profit ₹{{ week_profit|floatformat:0 }}
+    </strong>
+    <a href="{% url 'reports' %}" class="btn-sm blue" style="margin-left:auto">Full Report →</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

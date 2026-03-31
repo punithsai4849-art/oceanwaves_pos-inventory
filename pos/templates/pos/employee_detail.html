@@ -1,0 +1,141 @@
+{% extends 'pos/base.html' %}
+{% load static %}
+{% block title %}{{ emp.full_name }} — Payslips{% endblock %}
+{% block content %}
+<div class="pg">
+  <div class="pg-header">
+    <div>
+      <a href="{% url 'employee_list' %}" class="back-link"><i class="fas fa-arrow-left"></i> All Employees</a>
+      <h1><i class="fas fa-user"></i> {{ emp.full_name }}</h1>
+      <p>{{ emp.employee_id }} · {{ emp.designation|default:"Staff" }} · {{ emp.get_employment_type_display }}</p>
+    </div>
+    <button class="btn-primary" onclick="openModal('genPayslipModal')">
+      <i class="fas fa-file-invoice"></i> Generate Payslip
+    </button>
+  </div>
+
+  <!-- Employee info card -->
+  <div class="dash-grid2" style="margin-bottom:20px;">
+    <div class="dash-card">
+      <div class="dc-header"><h3><i class="fas fa-user-circle"></i> Employee Info</h3></div>
+      <div style="padding:16px;">
+        <table style="width:100%;font-size:13px;border-collapse:collapse;">
+          {% for label,val in emp_details %}
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:8px 0;color:var(--muted);font-weight:700;width:40%;">{{ label }}</td>
+            <td style="padding:8px 0;">{{ val }}</td>
+          </tr>
+          {% endfor %}
+          <tr style="border-bottom:1px solid var(--border);"><td style="padding:8px 0;color:var(--muted);font-weight:700;">Phone</td><td>{{ emp.phone|default:"—" }}</td></tr>
+          <tr style="border-bottom:1px solid var(--border);"><td style="padding:8px 0;color:var(--muted);font-weight:700;">Email</td><td>{{ emp.email|default:"—" }}</td></tr>
+          <tr style="border-bottom:1px solid var(--border);"><td style="padding:8px 0;color:var(--muted);font-weight:700;">Date Joined</td><td>{{ emp.date_joined|date:"d M Y" }}</td></tr>
+          <tr style="border-bottom:1px solid var(--border);"><td style="padding:8px 0;color:var(--muted);font-weight:700;">Pay Cycle</td><td>{{ emp.get_pay_cycle_display }}</td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="dash-card">
+      <div class="dc-header"><h3><i class="fas fa-rupee-sign"></i> Salary Structure</h3></div>
+      <div style="padding:16px;">
+        <div class="bt-row" style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:14px;"><span>Basic Salary</span><span>₹{{ emp.basic_salary }}</span></div>
+        <div class="bt-row" style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:14px;color:#16a34a;"><span>Allowances</span><span>+₹{{ emp.allowances }}</span></div>
+        <div class="bt-row" style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:14px;color:#dc2626;"><span>Deductions</span><span>-₹{{ emp.deductions }}</span></div>
+        <div style="display:flex;justify-content:space-between;padding:10px 0;font-size:18px;font-weight:800;color:var(--primary);border-top:2px solid var(--primary);margin-top:4px;"><span>Net Salary</span><span>₹{{ emp.net_salary }}</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Payslips -->
+  <div class="table-card">
+    <div class="wm-bg"><img src="{% static 'pos/images/logo.jpg' %}" alt=""></div>
+    <div class="tc-header"><h3><i class="fas fa-file-invoice"></i> Payslips ({{ payslips|length }})</h3></div>
+    <table class="data-table">
+      <thead><tr><th>Month/Year</th><th>Basic</th><th>Allowances</th><th>Bonus</th><th>Deductions</th><th>Net Pay</th><th>Status</th><th>Payment Date</th><th>Actions</th></tr></thead>
+      <tbody>
+      {% for slip in payslips %}
+      <tr>
+        <td><strong>{{ slip.get_month_display }} {{ slip.year }}</strong></td>
+        <td class="tr">₹{{ slip.basic_salary }}</td>
+        <td class="tr">₹{{ slip.allowances }}</td>
+        <td class="tr text-green">₹{{ slip.bonus }}</td>
+        <td class="tr text-red">₹{{ slip.deductions }}</td>
+        <td class="tr"><strong>₹{{ slip.net_pay }}</strong></td>
+        <td>
+          {% if slip.status == 'PAID' %}
+          <span class="pill pill-green"><i class="fas fa-check"></i> Paid</span>
+          {% else %}
+          <span class="pill pill-orange">Pending</span>
+          {% endif %}
+        </td>
+        <td>{{ slip.payment_date|date:"d M Y"|default:"—" }}</td>
+        <td style="display:flex;gap:5px;">
+          <a href="{% url 'payslip_print' slip.id %}" target="_blank" class="btn-icon-sm blue" title="Print"><i class="fas fa-print"></i></a>
+          {% if slip.status == 'PENDING' %}
+          <form method="POST" action="{% url 'payslip_mark_paid' slip.id %}" style="display:inline;">
+            {% csrf_token %}
+            <input type="hidden" name="payment_mode" value="CASH">
+            <button type="submit" class="btn-icon-sm green" title="Mark Paid"><i class="fas fa-check"></i></button>
+          </form>
+          {% endif %}
+          <form method="POST" action="{% url 'payslip_delete' slip.id %}" style="display:inline;" onsubmit="return confirm('Delete this payslip?')">
+            {% csrf_token %}
+            <button type="submit" class="btn-icon-sm red" title="Delete"><i class="fas fa-trash"></i></button>
+          </form>
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="9" class="empty-state"><i class="fas fa-file-invoice"></i><p>No payslips yet. Generate the first one!</p></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Generate Payslip Modal -->
+<div class="modal-overlay" id="genPayslipModal">
+  <div class="modal">
+    <div class="mhdr"><h3><i class="fas fa-file-invoice"></i> Generate Payslip — {{ emp.full_name }}</h3><button onclick="closeModal('genPayslipModal')">×</button></div>
+    <form method="POST" action="{% url 'payslip_generate' emp.id %}" class="mform">
+      {% csrf_token %}
+      <div class="frow">
+        <div class="fg">
+          <label>Month *</label>
+          <select name="month" required>
+            <option value="1">January</option><option value="2">February</option>
+            <option value="3">March</option><option value="4">April</option>
+            <option value="5">May</option><option value="6">June</option>
+            <option value="7">July</option><option value="8">August</option>
+            <option value="9">September</option><option value="10">October</option>
+            <option value="11">November</option><option value="12">December</option>
+          </select>
+        </div>
+        <div class="fg"><label>Year *</label><input type="number" name="year" value="2026" min="2020" max="2030" required></div>
+      </div>
+      <div class="price-section-label">💰 Salary for this month</div>
+      <div class="frow frow3">
+        <div class="fg"><label>Basic Salary</label><input type="number" name="basic_salary" value="{{ emp.basic_salary }}" step="0.01" min="0"></div>
+        <div class="fg"><label>Allowances</label><input type="number" name="allowances" value="{{ emp.allowances }}" step="0.01" min="0"></div>
+        <div class="fg"><label>Bonus</label><input type="number" name="bonus" value="0" step="0.01" min="0"></div>
+      </div>
+      <div class="frow">
+        <div class="fg"><label>Deductions</label><input type="number" name="deductions" value="{{ emp.deductions }}" step="0.01" min="0"></div>
+        <div class="fg">
+          <label>Status</label>
+          <select name="status">
+            <option value="PENDING">Pending</option>
+            <option value="PAID">Paid</option>
+          </select>
+        </div>
+      </div>
+      <div class="frow">
+        <div class="fg"><label>Payment Date</label><input type="date" name="payment_date"></div>
+        <div class="fg"><label>Payment Mode</label><input type="text" name="payment_mode" placeholder="Cash / Bank Transfer / UPI"></div>
+      </div>
+      <div class="fg"><label>Notes</label><textarea name="notes" rows="2" placeholder="Any remarks..."></textarea></div>
+      <div class="mactions">
+        <button type="button" class="btn-secondary" onclick="closeModal('genPayslipModal')">Cancel</button>
+        <button type="submit" class="btn-primary"><i class="fas fa-save"></i> Generate Payslip</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

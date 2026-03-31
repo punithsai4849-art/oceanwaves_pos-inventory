@@ -1,0 +1,133 @@
+{% extends 'pos/base.html' %}
+{% block title %}Wholesale Customers — Ocean Waves{% endblock %}
+{% block content %}
+<div class="pg">
+  <div class="pg-header">
+    <div>
+      <h1><i class="fas fa-handshake"></i> Wholesale Customers</h1>
+      <p>Manage wholesale buyers and credit privileges</p>
+    </div>
+    {% if profile.is_superadmin or profile.is_wholesale_exec or profile.is_owner or profile.is_area_manager %}
+    <button class="btn-primary" onclick="openModal('addCustomerModal')"><i class="fas fa-plus"></i> Add Customer</button>
+    {% endif %}
+  </div>
+
+  <div class="table-card">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Contact</th>
+          <th>GST</th>
+          <th>Credit Enabled</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for c in customers %}
+      <tr>
+        <td><strong>{{ c.name }}</strong></td>
+        <td>{{ c.phone }}<br><small>{{ c.email }}</small></td>
+        <td>{{ c.gst|default:"—" }}</td>
+        <td>
+          {% if c.is_credit_enabled %}
+          <span class="pill pill-green">Yes ({{ c.credit_duration_days }} days)</span>
+          {% else %}
+          <span class="pill pill-red">No</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if profile.is_superadmin or profile.is_wholesale_exec or profile.is_owner or profile.is_area_manager %}
+          <button class="btn-icon-sm blue" title="Edit" 
+              data-id="{{ c.id }}"
+              data-name="{{ c.name|escapejs }}"
+              data-phone="{{ c.phone|escapejs }}"
+              data-email="{{ c.email|escapejs }}"
+              data-gst="{{ c.gst|escapejs }}"
+              data-duration="{{ c.credit_duration_days }}"
+              data-credit="{{ c.is_credit_enabled|yesno:'true,false' }}"
+              onclick="openEditCustomer(this)">
+            <i class="fas fa-edit"></i>
+          </button>
+          {% else %}
+          —
+          {% endif %}
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="5" class="empty-mini">No wholesale customers found.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modals -->
+<div class="modal-overlay" id="addCustomerModal">
+  <div class="modal">
+    <div class="mhdr"><h3>Add Customer</h3><button onclick="closeModal('addCustomerModal')">×</button></div>
+    <form method="POST" action="{% url 'wholesale_customer_add' %}" class="mform">
+      {% csrf_token %}
+      <div class="frow">
+        <div class="fg"><label>Name *</label><input type="text" name="name" required></div>
+        <div class="fg"><label>Phone</label><input type="text" name="phone"></div>
+      </div>
+      <div class="frow">
+        <div class="fg"><label>Email</label><input type="email" name="email"></div>
+        <div class="fg"><label>GST</label><input type="text" name="gst"></div>
+      </div>
+      <div class="frow">
+        <div class="fg"><label>Credit Limit (Days)</label><input type="number" name="credit_duration_days" value="7" min="7" max="30"></div>
+        <div class="fg checkbox-fg" style="display:flex;align-items:center;padding-top:20px;">
+          <label><input type="checkbox" name="is_credit_enabled" checked> Allow Credit</label>
+        </div>
+      </div>
+      <div class="mactions">
+        <button type="button" class="btn-secondary" onclick="closeModal('addCustomerModal')">Cancel</button>
+        <button type="submit" class="btn-primary">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal-overlay" id="editCustomerModal">
+  <div class="modal">
+    <div class="mhdr"><h3>Edit Customer</h3><button onclick="closeModal('editCustomerModal')">×</button></div>
+    <form id="editCustomerForm" method="POST" class="mform">
+      {% csrf_token %}
+      <div class="frow">
+        <div class="fg"><label>Name *</label><input type="text" name="name" id="ecName" required></div>
+        <div class="fg"><label>Phone</label><input type="text" name="phone" id="ecPhone"></div>
+      </div>
+      <div class="frow">
+        <div class="fg"><label>Email</label><input type="email" name="email" id="ecEmail"></div>
+        <div class="fg"><label>GST</label><input type="text" name="gst" id="ecGst"></div>
+      </div>
+      <div class="frow">
+        <div class="fg"><label>Credit Limit (Days)</label><input type="number" name="credit_duration_days" id="ecDays" min="7" max="30"></div>
+        <div class="fg checkbox-fg" style="display:flex;align-items:center;padding-top:20px;">
+          <label><input type="checkbox" name="is_credit_enabled" id="ecCredit"> Allow Credit</label>
+        </div>
+      </div>
+      <div class="mactions">
+        <button type="button" class="btn-secondary" onclick="closeModal('editCustomerModal')">Cancel</button>
+        <button type="submit" class="btn-primary">Update</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function openEditCustomer(btn) {
+  const d = btn.dataset;
+  document.getElementById('ecName').value = d.name || '';
+  document.getElementById('ecPhone').value = d.phone || '';
+  document.getElementById('ecEmail').value = d.email || '';
+  document.getElementById('ecGst').value = d.gst || '';
+  document.getElementById('ecDays').value = d.duration || 7;
+  document.getElementById('ecCredit').checked = d.credit === 'true';
+  document.getElementById('editCustomerForm').action = `/wholesale-customers/${d.id}/edit/`;
+  openModal('editCustomerModal');
+}
+</script>
+{% endblock %}

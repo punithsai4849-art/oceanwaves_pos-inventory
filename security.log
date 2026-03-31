@@ -1,0 +1,42 @@
+2026-03-29 11:31:27,717 WARNING [LOGIN_FAILED] user=Anonymous ip=127.0.0.1 detail=username=test_staff
+2026-03-29 11:31:59,939 WARNING [LOGIN_FAILED] user=Anonymous ip=127.0.0.1 detail=username=test_staff
+2026-03-29 11:32:24,349 WARNING [LOGIN_FAILED] user=Anonymous ip=127.0.0.1 detail=username=test_staff
+2026-03-29 11:34:24,392 WARNING [LOGIN_FAILED] user=Anonymous ip=127.0.0.1 detail=username=punith_admin
+2026-03-29 11:35:15,056 WARNING [LOGIN_FAILED] user=Anonymous ip=127.0.0.1 detail=username=punith_admin
+2026-03-29 11:38:30,745 WARNING [LOGIN_FAILED] user=Anonymous ip=127.0.0.1 detail=username=punith_admin
+2026-03-29 11:40:17,936 INFO [LOGIN_SUCCESS] user=punith_admin ip=127.0.0.1 detail=username=punith_admin
+2026-03-29 12:15:32,026 INFO [LOGIN_SUCCESS] user=punith_admin ip=127.0.0.1 detail=username=punith_admin
+2026-03-29 15:14:41,901 INFO [LOGIN_SUCCESS] user=punith_admin ip=127.0.0.1 detail=username=punith_admin
+2026-03-29 15:15:16,190 INFO [USER_DELETED] user=punith_admin ip=127.0.0.1 detail=deleted_user=test_owner
+2026-03-29 15:15:18,458 INFO [USER_DELETED] user=punith_admin ip=127.0.0.1 detail=deleted_user=test_staff
+2026-03-29 15:16:00,993 INFO [USER_CREATED] user=punith_admin ip=127.0.0.1 detail=created_user=rahul_tanuku role=STAFF
+2026-03-29 15:16:04,523 INFO [LOGOUT] user=punith_admin ip=127.0.0.1 detail=username=punith_admin
+2026-03-29 15:19:16,279 INFO [LOGIN_SUCCESS] user=rahul_tanuku ip=127.0.0.1 detail=username=rahul_tanuku
+2026-03-29 15:20:16,561 INFO [LOGOUT] user=rahul_tanuku ip=127.0.0.1 detail=username=rahul_tanuku
+2026-03-29 15:21:05,998 INFO [LOGIN_SUCCESS] user=punith_admin ip=127.0.0.1 detail=username=punith_admin
+2026-03-29 16:15:55,605 INFO [USER_CREATED] user=punith_admin ip=127.0.0.1 detail=created_user=punith_area role=AREAMANAGER
+2026-03-29 16:16:20,099 INFO [LOGOUT] user=punith_admin ip=127.0.0.1 detail=username=punith_admin
+2026-03-29 16:16:31,059 INFO [LOGIN_SUCCESS] user=punith_tanuku ip=127.0.0.1 detail=username=punith_tanuku
+2026-03-29 21:28:22,122 INFO [LOGOUT] user=punith_tanuku ip=127.0.0.1 detail=username=punith_tanuku
+2026-03-29 21:28:30,459 WARNING [LOGIN_FAILED] user=Anonymous ip=127.0.0.1 detail=username=punith_area
+2026-03-29 21:28:37,660 INFO [LOGIN_SUCCESS] user=punith_area ip=127.0.0.1 detail=username=punith_area
+2026-03-29 21:28:43,919 INFO [LOGOUT] user=punith_area ip=127.0.0.1 detail=username=punith_area
+2026-03-29 21:28:53,444 INFO [LOGIN_SUCCESS] user=punith_admin ip=127.0.0.1 detail=username=punith_admin
+2026-03-29 21:30:30,726 INFO [USER_DELETED] user=punith_admin ip=127.0.0.1 detail=deleted_user=test_areamanager
+2026-03-29 21:30:52,931 INFO [LOGOUT] user=punith_admin ip=127.0.0.1 detail=username=punith_admin
+2026-03-29 21:31:02,508 INFO [LOGIN_SUCCESS] user=punith_area ip=127.0.0.1 detail=username=punith_area
+2026-03-29 21:44:21,782 INFO [LOGOUT] user=punith_area ip=127.0.0.1 detail=username=punith_area
+2026-03-29 21:44:27,886 INFO [LOGIN_SUCCESS] user=punith_tanuku ip=127.0.0.1 detail=username=punith_tanuku
+2026-03-29 22:21:53,123 INFO [LOGIN_SUCCESS] user=test_admin ip=127.0.0.1 detail=username=test_admin
+2026-03-30 09:59:46,627 INFO [LOGIN_SUCCESS] user=punith_tanuku ip=127.0.0.1 detail=username=punith_tanuku
+2026-03-30 20:27:12,404 INFO [LOGIN_SUCCESS] user=punith_tanuku ip=127.0.0.1 detail=username=punith_tanuku
+2026-03-30 20:27:20,139 INFO [BILL_CREATED] user=punith_tanuku ip=127.0.0.1 detail=bill=S1-RT00004 amount=600.00 mode=CASH
+2026-03-30 20:27:37,251 INFO [BILL_CREATED] user=punith_tanuku ip=127.0.0.1 detail=bill=S1-RT00005 amount=600.00 mode=CASH
+2026-03-30 20:27:55,541 INFO [BILL_CREATED] user=punith_tanuku ip=127.0.0.1 detail=bill=S1-RT00006 amount=450.000 mode=CASH
+2026-03-30 21:29:22,673 INFO [LOGOUT] user=punith_tanuku ip=127.0.0.1 detail=username=punith_tanuku
+2026-03-30 21:29:28,091 INFO [LOGIN_SUCCESS] user=punith_tanuku ip=127.0.0.1 detail=username=punith_tanuku
+2026-03-30 21:29:34,553 INFO [LOGOUT] user=punith_tanuku ip=127.0.0.1 detail=username=punith_tanuku
+2026-03-30 21:29:42,480 INFO [LOGIN_SUCCESS] user=punith_admin ip=127.0.0.1 detail=username=punith_admin
+2026-03-30 21:30:00,048 INFO [LOGOUT] user=punith_admin ip=127.0.0.1 detail=username=punith_admin
+2026-03-30 21:30:06,759 INFO [LOGIN_SUCCESS] user=punith_tanuku ip=127.0.0.1 detail=username=punith_tanuku
+2026-03-30 21:30:12,570 INFO [BILL_CREATED] user=punith_tanuku ip=127.0.0.1 detail=bill=S1-RT00007 amount=600.00 mode=CASH

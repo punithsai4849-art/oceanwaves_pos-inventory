@@ -1,0 +1,111 @@
+{% extends 'pos/base.html' %}
+{% load static %}
+{% block title %}Expenses — {{ store.name }}{% endblock %}
+{% block content %}
+<div class="pg">
+  <div class="pg-header">
+    <div>
+      <h1><i class="fas fa-minus-circle"></i> Expenses — {{ store.name }}</h1>
+      <p>Track and manage all store expenses with bill uploads</p>
+    </div>
+    <button class="btn-primary" onclick="openModal('addExpenseModal')">
+      <i class="fas fa-plus"></i> Add Expense
+    </button>
+  </div>
+
+  <!-- KPIs -->
+  <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr)">
+    <div class="kpi red"><div class="kpi-icon"><i class="fas fa-rupee-sign"></i></div>
+      <div class="kpi-body"><span class="kpi-val">₹{{ total|floatformat:2 }}</span><span class="kpi-lbl">Total Expenses</span></div></div>
+    <div class="kpi orange"><div class="kpi-icon"><i class="fas fa-calendar-day"></i></div>
+      <div class="kpi-body"><span class="kpi-val">₹{{ day_total|floatformat:2 }}</span><span class="kpi-lbl">Today's Expenses</span></div></div>
+    <div class="kpi blue"><div class="kpi-icon"><i class="fas fa-list"></i></div>
+      <div class="kpi-body"><span class="kpi-val">{{ expenses|length }}</span><span class="kpi-lbl">Total Records</span></div></div>
+  </div>
+
+  <!-- Filter by date -->
+  <div class="filter-bar">
+    <form method="GET" style="display:flex;gap:8px;align-items:center;">
+      <label style="font-size:13px;font-weight:600;color:var(--muted);">Filter by date:</label>
+      <input type="date" name="date" value="{{ report_date|date:'Y-m-d' }}" class="date-input" onchange="this.form.submit()">
+    </form>
+  </div>
+
+  <!-- Expenses Table -->
+  <div class="table-card">
+    <div class="wm-bg"><img src="{% static 'pos/images/logo.jpg' %}" alt=""></div>
+    <div class="tc-header"><h3><i class="fas fa-list"></i> All Expenses</h3></div>
+    <table class="data-table">
+      <thead>
+        <tr><th>Date</th><th>Category</th><th>Description</th><th>Amount</th><th>Bill</th><th>Added By</th><th>Action</th></tr>
+      </thead>
+      <tbody>
+      {% for e in expenses %}
+      <tr>
+        <td>{{ e.date|date:"d M Y" }}</td>
+        <td><span class="cat-badge cat-other">{{ e.get_category_display }}</span></td>
+        <td>{{ e.description }}</td>
+        <td class="tr"><strong>₹{{ e.amount }}</strong></td>
+        <td>
+          {% if e.bill_pdf %}
+          <a href="{{ e.bill_pdf.url }}" target="_blank" class="btn-sm blue">
+            <i class="fas fa-file-pdf"></i> View PDF
+          </a>
+          {% else %}
+          <span style="color:var(--muted);font-size:12px;">No bill</span>
+          {% endif %}
+        </td>
+        <td>{{ e.created_by.username|default:"—" }}</td>
+        <td>
+          <form method="POST" action="{% url 'expense_delete' e.id %}" style="display:inline;" onsubmit="return confirm('Delete this expense?')">
+            {% csrf_token %}
+            <button type="submit" class="btn-icon-sm red"><i class="fas fa-trash"></i></button>
+          </form>
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="7" class="empty-state"><i class="fas fa-minus-circle"></i><p>No expenses recorded yet.</p></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Add Expense Modal -->
+<div class="modal-overlay" id="addExpenseModal">
+  <div class="modal">
+    <div class="mhdr"><h3><i class="fas fa-plus-circle"></i> Add Expense</h3><button onclick="closeModal('addExpenseModal')">×</button></div>
+    <form method="POST" action="{% url 'expense_add' %}" enctype="multipart/form-data" class="mform">
+      {% csrf_token %}
+      <div class="frow">
+        <div class="fg">
+          <label>Category *</label>
+          <select name="category" required>
+            <option value="RENT">Rent</option>
+            <option value="SALARY">Salary</option>
+            <option value="UTILITIES">Utilities</option>
+            <option value="TRANSPORT">Transport</option>
+            <option value="PURCHASE">Stock Purchase</option>
+            <option value="OTHER">Other</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label>Date *</label>
+          <input type="date" name="date" value="{{ report_date|date:'Y-m-d' }}" required>
+        </div>
+      </div>
+      <div class="fg"><label>Description *</label><input type="text" name="description" required placeholder="e.g. Monthly rent payment"></div>
+      <div class="fg"><label>Amount (₹) *</label><input type="number" name="amount" step="0.01" min="0" required placeholder="0.00"></div>
+      <div class="fg">
+        <label>Upload Bill / Invoice (PDF optional)</label>
+        <input type="file" name="bill_pdf" accept=".pdf,.jpg,.jpeg,.png" style="padding:8px;background:#f8fcff;border:2px dashed var(--border);border-radius:8px;width:100%;cursor:pointer;">
+        <small style="color:var(--muted);font-size:11px;">Accepted: PDF, JPG, PNG</small>
+      </div>
+      <div class="mactions">
+        <button type="button" class="btn-secondary" onclick="closeModal('addExpenseModal')">Cancel</button>
+        <button type="submit" class="btn-primary"><i class="fas fa-save"></i> Save Expense</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

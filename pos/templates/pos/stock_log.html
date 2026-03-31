@@ -1,0 +1,39 @@
+{% extends 'pos/base.html' %}
+{% load static %}
+{% block title %}Stock Log — {{ store.name }}{% endblock %}
+{% block content %}
+<div class="pg">
+  <div class="pg-header">
+    <div><h1><i class="fas fa-history"></i> Stock Log — {{ store.name }}</h1><p>Complete audit trail of all stock movements</p></div>
+    <a href="{% url 'inventory' %}" class="btn-secondary"><i class="fas fa-arrow-left"></i> Back to Inventory</a>
+  </div>
+  <div class="table-card">
+    <div class="wm-bg"><img src="{% static 'pos/images/logo.jpg' %}" alt=""></div>
+    <table class="data-table">
+      <thead>
+        <tr><th>Date & Time</th><th>Product</th><th>Movement</th><th>Qty (kg)</th><th>Balance (kg)</th><th>Reference</th><th>By</th></tr>
+      </thead>
+      <tbody>
+        {% for log in logs %}
+        <tr>
+          <td>{{ log.created_at|date:"d/m/Y h:i A" }}</td>
+          <td><strong>{{ log.product.name }}</strong></td>
+          <td>
+            {% if log.movement == 'IN' %}<span class="pill pill-green">↑ IN</span>
+            {% elif log.movement == 'OUT' %}<span class="pill pill-red">↓ OUT</span>
+            {% elif log.movement == 'WASTE' %}<span class="pill pill-orange">⚠ WASTE</span>
+            {% else %}<span class="pill pill-blue">≈ ADJ</span>{% endif %}
+          </td>
+          <td class="tr"><strong>{{ log.quantity }}</strong></td>
+          <td class="tr">{{ log.balance }}</td>
+          <td>{{ log.reference|default:"—" }}</td>
+          <td>{{ log.created_by.username|default:"—" }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" class="empty-state"><i class="fas fa-history"></i><p>No stock movements recorded yet.</p></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
